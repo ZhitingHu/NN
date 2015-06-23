@@ -7,7 +7,8 @@
 #include <boost/shared_ptr.hpp>
 
 #include "leveldb/db.h"
-#include "sufficient_vector.hpp"
+#include "sufficient_vector_queue.hpp"
+
 namespace util {
 
 // An extension of google flags. It is a singleton that stores 1) google flags
@@ -29,10 +30,21 @@ public:
   
   static int num_app_threads() { return get_instance().num_app_threads_; }
   static int num_rows_per_table() { return get_instance().num_rows_per_table_; }
+
+  // SVB
   static bool svb_completed() { return get_instance().svb_completed_; }
   static void set_sev_completed() { get_instance().svb_completed_ = true; }
   static bool use_svb() { return get_instance().use_svb_; }
-  static void set_use_svb() { get_instance().use_svb_ = true; }
+  static void set_use_svb(const bool value) { get_instance().use_svb_ = value; }
+  static caffe::SufficientVectorQueue* get_send_buffer_(const int layer_id) {
+    CHECK_LT(layer_id, get_instance().send_buffer_.size());
+    return get_instance().send_buffer_[layer_id];
+  }
+  static caffe::SufficientVectorQueue* get_recv_buffer_(const int layer_id) {
+    CHECK_LT(layer_id, get_instance().recv_buffer_.size());
+    return get_instance().recv_buffer_[layer_id];
+  }
+  void InitSVB(const int num_layers);
 
   static std::vector<boost::shared_ptr<leveldb::DB> >& test_dbs() { 
     return get_instance().test_dbs_; 
@@ -59,9 +71,9 @@ private:
   int num_app_threads_;
   int num_rows_per_table_;
 
-  std::vector<std::vector<caffe::SufficientVector*> > send_buffer_;
-  std::vector<std::vector<caffe::SufficientVector*> > recv_buffer_;
-  bool use_svb_; // true of NN has inner_product layer(s)
+  std::vector<caffe::SufficientVectorQueue*> send_buffer_;
+  std::vector<caffe::SufficientVectorQueue*> recv_buffer_;
+  bool use_svb_;
   bool svb_completed_;
 
   // LEVELDB

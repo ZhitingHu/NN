@@ -48,8 +48,11 @@ class Solver {
   // Get the update value for the current iteration.
   virtual void ComputeUpdateValue(const int param_id) = 0;
   virtual void ComputeUpdateValue() = 0;
-  virtual void ThreadSyncWithPS(const shared_ptr<Layer<Dtype> >& layer);
-  virtual void ThreadSyncWithSVB(const shared_ptr<Layer<Dtype> >& layer);
+  virtual void ThreadSyncWithPS(const shared_ptr<Blob<Dtype> >& param,
+      const int param_id, const int param_owner, const int clock);
+  virtual void ThreadSyncWithSVB(
+    shared_ptr<Layer<Dtype> >& layer, const int layer_id,
+    const vector<Blob<Dtype>*>& top, const vector<Blob<Dtype>*>& bottom);
   virtual void JoinSyncThreads();
 
   // The Solver::Snapshot function implements the basic snapshotting utility

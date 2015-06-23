@@ -23,12 +23,12 @@ solver_filename="${app_dir}/models/bvlc_reference_caffenet/solver.prototxt"
 #snapshot_filename="${app_dir}/(SOLVERSTATE_FILE)"
 
 # System parameters:
-num_app_threads=2
+num_app_threads=1
 num_table_threads=$(( num_app_threads + 1 ))
 param_table_staleness=0
-loss_table_staleness=100
-num_comm_channels_per_client=2
-num_rows_per_table=32
+loss_table_staleness=10
+num_comm_channels_per_client=1
+num_rows_per_table=256
 consistency_model="SSPPush"
 svb=false
 

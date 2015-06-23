@@ -135,6 +135,7 @@ class Blob {
   Dtype* mutable_cpu_diff();
   Dtype* mutable_gpu_diff();
   void Update();
+  void Update(const Dtype* update);
   void SyncWithPSTable(const int clock);
 
   void FromProto(const BlobProto& proto, const bool init_ps_table = false);
@@ -166,6 +167,7 @@ class Blob {
 
  protected:
   void UpdatePSTable();
+  void UpdatePSTable(const Dtype* update);
   Dtype* ReadPSTable(const int clock) const;
 
   shared_ptr<SyncedMemory> data_;

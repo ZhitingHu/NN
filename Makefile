@@ -6,9 +6,11 @@ include $(CONFIG_FILE)
 
 # Petuum
 CAFFE_DIR := $(shell readlink $(dir $(lastword $(MAKEFILE_LIST))) -f)
-#PETUUM_ROOT = /tank/projects/biglearning/pxie/github/public
+# PETUUM_ROOT = /tank/projects/biglearning/pxie/github/public
 PETUUM_ROOT = $(CAFFE_DIR)/../../
 include $(CAFFE_DIR)/defns-caffe.mk
+#CUDNN
+CUDNN_DIR := /tank/projects/biglearning/pxie/petuumgpu/cudnn 
 
 BUILD_DIR_LINK := $(BUILD_DIR)
 RELEASE_BUILD_DIR := .$(BUILD_DIR)_release
@@ -165,7 +167,7 @@ ifneq ("$(wildcard $(CUDA_DIR)/lib64)","")
 endif
 CUDA_LIB_DIR += $(CUDA_DIR)/lib
 
-INCLUDE_DIRS += $(BUILD_INCLUDE_DIR) ./src ./include
+INCLUDE_DIRS += $(BUILD_INCLUDE_DIR) ./src ./include $(CUDNN_DIR)
 ifneq ($(CPU_ONLY), 1)
 	INCLUDE_DIRS += $(CUDA_INCLUDE_DIR)
 	LIBRARY_DIRS += $(CUDA_LIB_DIR)
@@ -330,7 +332,7 @@ MATLAB_CXXFLAGS := $(CXXFLAGS) -Wno-uninitialized
 LINKFLAGS += -static-libstdc++ -fPIC $(COMMON_FLAGS) $(WARNINGS)
 
 # Petuum
-LDFLAGS += $(PETUUM_LDFLAGS_DIRS)
+LDFLAGS += $(PETUUM_LDFLAGS_DIRS) -L$(CUDNN_DIR)
 LDFLAGS += $(foreach librarydir,$(LIBRARY_DIRS),-L$(librarydir)) \
 		$(foreach library,$(LIBRARIES),-l$(library))
 #Petuum

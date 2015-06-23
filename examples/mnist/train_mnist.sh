@@ -23,7 +23,7 @@ solver_filename="${app_dir}/examples/mnist/lenet_solver.prototxt"
 #snapshot_filename="${app_dir}/examples/mnist/lenet_iter_100.solverstate"
 
 # System parameters:
-num_app_threads=2
+num_app_threads=1
 num_table_threads=$(( num_app_threads + 1 ))
 param_table_staleness=0
 loss_table_staleness=100
@@ -83,7 +83,7 @@ for ip in $unique_host_list; do
       --loss_table_staleness $loss_table_staleness \
       --num_comm_channels_per_client $num_comm_channels_per_client \
       --num_rows_per_table $num_rows_per_table \
-      --svb \
+      --svb=false \
       --stats_path ${output_dir}/caffe_stats.yaml \
       --solver=${solver_filename} \
       --net_outputs=${net_outputs_prefix}" #\

@@ -240,13 +240,10 @@ void Blob<Dtype>::Update() {
 }
 
 template <typename Dtype>
-void Blob<Dtype>::SyncWithPSTable(const int clock) {
-  CHECK(blob_mode_ == BlobProto_BlobMode_GLOBAL);
-  Dtype* data_temp = ReadPSTable(clock);
-  data_->set_cpu_ps_data(data_temp);
+void Blob<Dtype>::Update(const Dtype* update) {
+  UpdatePSTable(update);
 }
 
-// MULTIROW
 template <typename Dtype>
 void Blob<Dtype>::UpdatePSTable() {
   // flush diff_
@@ -265,7 +262,29 @@ void Blob<Dtype>::UpdatePSTable() {
   }
 }
 
-// MULTIROW
+template <typename Dtype>
+void Blob<Dtype>::UpdatePSTable(const Dtype* update) {
+  int update_idx = 0;
+  
+  for (int r = 0; r < util::Context::num_rows_per_table(); ++r) {
+    petuum::UpdateBatch<Dtype> update_batch(global_table_row_capacity_);
+    for (int i = 0; i < global_table_row_capacity_; ++i) {
+      update_batch.UpdateSet(i, i, Dtype(-1) * update[update_idx]);
+      ++update_idx;
+      if (update_idx >= count_) { break; }
+    }
+    global_table_ptr_->BatchInc(r, update_batch);
+    if (update_idx >= count_) { break; }
+  }
+}
+
+template <typename Dtype>
+void Blob<Dtype>::SyncWithPSTable(const int clock) {
+  CHECK(blob_mode_ == BlobProto_BlobMode_GLOBAL);
+  Dtype* data_temp = ReadPSTable(clock);
+  data_->set_cpu_ps_data(data_temp);
+}
+
 template <typename Dtype>
 Dtype* Blob<Dtype>::ReadPSTable(const int clock) const {
   CHECK(global_table_ptr_);
@@ -278,9 +297,11 @@ Dtype* Blob<Dtype>::ReadPSTable(const int clock) const {
   for (int r_idx = 0; r_idx < util::Context::num_rows_per_table(); ++r_idx) {
     row_caches[r_idx].resize(global_table_row_capacity_);
     petuum::RowAccessor row_acc;
+    //LOG(INFO) << "get";
     const auto& r = global_table_ptr_->template Get<petuum::DenseRow<Dtype> >(
         r_idx, &row_acc, clock);
     r.CopyToVector(&row_caches[r_idx]);
+    //LOG(INFO) << "get done";
   }
 
   int data_idx = 0;

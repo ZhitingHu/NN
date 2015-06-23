@@ -26,7 +26,7 @@ solver_filename="${app_dir}/examples/cifar10/cifar10_quick_solver.prototxt"
 num_app_threads=1
 num_table_threads=$(( num_app_threads + 1 ))
 param_table_staleness=0
-loss_table_staleness=100
+loss_table_staleness=20
 num_comm_channels_per_client=1
 num_rows_per_table=1
 consistency_model="SSPPush"
@@ -43,7 +43,7 @@ unique_host_list=`cat $host_file | awk '{ print $2 }' | uniq`
 num_unique_hosts=`cat $host_file | awk '{ print $2 }' | uniq | wc -l`
 
 output_dir=$app_dir/output
-output_dir="${output_dir}/caffe.${dataset}.S${param_table_staleness}"
+output_dir="${output_dir}/caffe.${dataset}.S${staleness}"
 output_dir="${output_dir}.M${num_unique_hosts}"
 output_dir="${output_dir}.T${num_table_threads}"
 log_dir=$output_dir/logs
@@ -65,13 +65,13 @@ for ip in $unique_host_list; do
 
   cmd="mkdir -p ${output_dir}; \
       mkdir -p ${log_path}; \
-      setenv GLOG_logtostderr false; \
-      setenv GLOG_stderrthreshold 0; \
-      setenv GLOG_log_dir $log_path; \
-      setenv GLOG_v -1; \
-      setenv GLOG_minloglevel 0; \
-      setenv GLOG_vmodule ""; \
-      setenv LD_LIBRARY_PATH /usr/local/cuda/lib64; \
+      GLOG_logtostderr=false \
+      GLOG_stderrthreshold=0 \
+      GLOG_log_dir=$log_path \
+      GLOG_v=-1 \
+      GLOG_minloglevel=0 \
+      GLOG_vmodule="" \
+      LD_LIBRARY_PATH=/usr/local/cuda/lib64 \
       $prog_path train \
       --consistency_model $consistency_model \
       --init_thread_access_table=true \
@@ -83,14 +83,14 @@ for ip in $unique_host_list; do
       --loss_table_staleness $loss_table_staleness \
       --num_comm_channels_per_client $num_comm_channels_per_client \
       --num_rows_per_table $num_rows_per_table \
-      --svb=false \
       --stats_path ${output_dir}/caffe_stats.yaml \
       --solver=${solver_filename} \
+      --svb=false \
       --net_outputs=${net_outputs_prefix}" #\
       #--snapshot=${snapshot_filename}"
 
-  ssh $ssh_options $ip $cmd &
-  #eval $cmd  # Use this to run locally (on one machine).
+  #ssh $ssh_options $ip $cmd &
+  eval $cmd  # Use this to run locally (on one machine).
 
   # Wait a few seconds for the name node (client 0) to set up
   if [ $client_id -eq 0 ]; then

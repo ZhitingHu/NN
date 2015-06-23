@@ -1,31 +1,53 @@
 #include <cstring>
 
-#include "caffe/common.hpp"
-#include "caffe/syncedmem.hpp"
 #include "caffe/sufficient_vector.hpp"
-#include "caffe/util/math_functions.hpp"
 
 namespace caffe {
 
+SufficientVector::SufficientVector(size_t a_size, size_t b_size) {
+  a_size_ = a_size;
+  b_size_ = b_size;
+  a_.reset(new SyncedMemory(a_size_));
+  b_.reset(new SyncedMemory(b_size_));
+}
+
 SufficientVector::~SufficientVector() {
-  CaffeFreeHost(a_);
-  CaffeFreeHost(b_);
+  a_.reset();
+  b_.reset();
 }
 
-const void* SufficientVector::a() {
-  return (const void*)a_;
+const void* SufficientVector::cpu_a() const {
+  CHECK(a_);
+  return a_->cpu_data();
+}
+const void* SufficientVector::gpu_a() const {
+  CHECK(a_);
+  return a_->gpu_data();
+}
+const void* SufficientVector::cpu_b() const {
+  CHECK(b_);
+  return b_->cpu_data();
+}
+const void* SufficientVector::gpu_b() const {
+  CHECK(b_);
+  return b_->gpu_data();
 }
 
-const void* SufficientVector::b() {
-  return (const void*)b_;
+void* SufficientVector::mutable_cpu_a() {
+  CHECK(a_);
+  return a_->mutable_cpu_data();
 }
-
-void* SufficientVector::mutable_a() {
-  return a_;
+void* SufficientVector::mutable_gpu_a() {
+  CHECK(a_);
+  return a_->mutable_gpu_data();
 }
-
-void* SufficientVector::mutable_b() {
-  return b_;
+void* SufficientVector::mutable_cpu_b() {
+  CHECK(b_);
+  return b_->mutable_cpu_data();
+}
+void* SufficientVector::mutable_gpu_b() {
+  CHECK(b_);
+  return b_->mutable_gpu_data();
 }
 
 }  // namespace caffe

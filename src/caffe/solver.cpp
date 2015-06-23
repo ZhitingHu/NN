@@ -14,6 +14,7 @@
 #include "caffe/util/io.hpp"
 #include "caffe/util/math_functions.hpp"
 #include "caffe/util/upgrade_proto.hpp"
+#include "caffe/sufficient_vector.hpp"
 
 namespace caffe {
 
@@ -105,7 +106,6 @@ void Solver<Dtype>::InitTrainNet() {
   net_state.MergeFrom(param_.train_state());
   net_param.mutable_state()->CopyFrom(net_state);
   net_.reset(new Net<Dtype>(net_param, thread_id_, -1));
-  LOG(INFO) << "here";
 
   // Set up blobs' corresponding PS tables
   // output blobs
@@ -114,7 +114,6 @@ void Solver<Dtype>::InitTrainNet() {
       != layer_blobs_global_idx_ptr_->end());
   net_->set_table(
       layer_blobs_global_idx_ptr_->at(train_net_output_name)[0]);
-  LOG(INFO) << "here 1";
   // layer parameter blobs
   map<string, vector<int> >::const_iterator it 
       = layer_blobs_global_idx_ptr_->begin();
@@ -301,9 +300,11 @@ void Solver<Dtype>::Solve(const char* resume_file) {
     //LOG(INFO) << "syn ";
     //net_->SyncWithPS(clock_counter_ - table_staleness_);
     //LOG(INFO) << "syn done\t" << client_id_ << "\t" << total_timer_.elapsed() - syn_start_time;
+    //LOG(INFO) << "join " << client_id_;
     float join_start_time = total_timer_.elapsed();
     JoinSyncThreads();
-    LOG(INFO) << "join done\t" << client_id_ << "\t" << total_timer_.elapsed() - join_start_time;
+    if (client_id_ == 0)
+        LOG(INFO) << "join done\t" << client_id_ << "\t" << total_timer_.elapsed() - join_start_time;
 
     // Save a snapshot if needed.
     if (param_.snapshot() && iter_ > start_iter &&
@@ -320,9 +321,11 @@ void Solver<Dtype>::Solve(const char* resume_file) {
     net_->set_debug_info(display && param_.debug_info());
 
     float forward_start_time = total_timer_.elapsed();
-    Dtype loss = net_->ForwardBackward(bottom_vec);
+    if (client_id_ == 0)
+        LOG(INFO) << "compute " << client_id_;
     Dtype loss = ForwardBackward(bottom_vec);
-    LOG(INFO) << "compute done\t" << client_id_ << "\t" << total_timer_.elapsed() - forward_start_time;
+    if (client_id_ == 0)
+        LOG(INFO) << "compute done\t" << client_id_ << "\t" << total_timer_.elapsed() - forward_start_time;
 
     if (display) {
       if (client_id_ == 0 && thread_id_ == 0) {
@@ -409,6 +412,8 @@ Dtype Solver<Dtype>::ForwardBackward(const vector<Blob<Dtype>* >& bottom) {
 
   /// Forward
   net_->Forward(bottom, &loss);
+  if (client_id_ == 1)
+    LOG(INFO) << "forward done " << client_id_;
   
   /// Backward
   const vector<shared_ptr<Layer<Dtype> > >& layers = net_->layers();
@@ -418,9 +423,16 @@ Dtype Solver<Dtype>::ForwardBackward(const vector<Blob<Dtype>* >& bottom) {
       = net_->bottom_need_backward();
   vector<vector<Blob<Dtype>*> >& bottom_vecs = net_->bottom_vecs();
   for (int i = layers.size() - 1; i >= 0; --i) {
+    //if (client_id_ == 1)
+    //  LOG(INFO) << "back layer " << layers[i]->layer_param().name() << " " << client_id_;
+
     if (layer_need_backward[i]) {
-      layers[i]->Backward(
-          top_vecs[i], bottom_need_backward[i], &bottom_vecs[i]);
+      //if (client_id_ == 1)
+      //  LOG(INFO) << "backward " << layers[i]->layer_param().name() << " " << client_id_;
+      layers[i]->Backward(top_vecs[i], bottom_need_backward[i], &bottom_vecs[i]);
+      //if (client_id_ == 1)
+      //  LOG(INFO) << "backward " << layers[i]->layer_param().name() << " done " << client_id_;
+
       //if (debug_info_) { net_->BackwardDebugInfo(i); }
 
       // Sync with PS
@@ -432,49 +444,90 @@ Dtype Solver<Dtype>::ForwardBackward(const vector<Blob<Dtype>* >& bottom) {
         for (int j = 0; j < layer_params_id.size(); ++j) {
           //LOG(INFO) << "compute update param " << layer_params_id[j] << " " << net_->params().size() << " " 
           //    << layers[i]->layer_param().name();
-          ComputeUpdateValue(layer_params_id[j]);
+          const int param_id = layer_params_id[j];
+          ComputeUpdateValue(param_id);
+
+          const int param_owner = net_->param_owners()[param_id];
+          std::thread* sync_thread;
+          if (util::Context::use_svb()
+              && type == LayerParameter_LayerType_INNER_PRODUCT
+              && j == 0) { // weights of a inner product layer
+            // TODO
+            NOT_IMPLEMENTED;
+          } else {
+            sync_thread = new std::thread(&Solver::ThreadSyncWithPS, this, 
+                net_->params()[param_id], param_id, param_owner,
+                clock_counter_ - table_staleness_);
+          }
+          sync_threads_.push_back(sync_thread);
         }
+        //if (client_id_ == 1)
+        //  LOG(INFO) << "comp update " << layers[i]->layer_param().name() << " done " << client_id_;
+
         // Create thread for sync
-        std::thread* sync_thread = new std::thread(&Solver::ThreadSyncWithPS, this, 
-            layers[i]);
-        sync_threads_.push_back(sync_thread);
+        //std::thread* sync_thread = new std::thread(&Solver::ThreadSyncWithPS, this, 
+        //    layers[i], clock_counter_ - table_staleness_);
+        //if (client_id_ == 1)
+        //  LOG(INFO) << "back sync " << layers[i]->layer_param().name() << " done " << client_id_;
       }
     }
+
+    //if (client_id_ == 1)
+    //  LOG(INFO) << "back layer " << layers[i]->layer_param().name() << " done " << client_id_;
   } // end of layers
 
   //LOG(INFO) << "fb end";
   return loss;
 }
 
-/// This function is used for a created thread to sync one (conv) layer with the PS
+/// This function is used for created thread to sync one (conv) layer with the PS
 template <typename Dtype>
-void Solver<Dtype>::ThreadSyncWithPS(const shared_ptr<Layer<Dtype> >& layer) {
-  //LOG(INFO) << "sync thread begin " << layer->layer_param().name();
-  // Push updates to PS
-  for (int i = 0; i < layer->blobs().size(); ++i) {
-    layer->blobs()[i]->Update();
+void Solver<Dtype>::ThreadSyncWithPS(const shared_ptr<Blob<Dtype> >& param,
+    const int param_id, const int param_owner, const int clock) {
+  //LOG(INFO) << "sync thread begin " << layer->layer_param().name() << " clock "
+  //    << clock;
+
+  if (param_owner < 0) {
+    // Push updates to PS
+    param->Update();
+    // Read fresh values from PS
+    param->SyncWithPSTable(clock);
+  } else {
+    // Push updates to PS
+    net_->params()[param_owner]->Update(param->cpu_diff());
+    // Read fresh values from PS
+    net_->params()[param_owner]->SyncWithPSTable(clock);
   }
-  // Read updates from PS
-  for (int i = 0; i < layer->blobs().size(); ++i) {
-    layer->blobs()[i]->SyncWithPSTable(clock_counter_ - table_staleness_);
-  }
+
   //LOG(ERROR) << "sync thread end " << layer->layer_param().name() << " clock "
-  //    << clock_counter_ - table_staleness_;
+  //    << clock;
 }
 
 /// This function is used for created thread to sync one (ip) layer through SVB
 template <typename Dtype>
-void Solver<Dtype>::ThreadSyncWithSVB(const shared_ptr<Layer<Dtype> >& layer) {
-  //LOG(INFO) << "sync thread begin " << layer->layer_param().name();
-  // Append SVs to send buffer
-  for (int i = 0; i < layer->blobs().size(); ++i) {
-    //layer->blobs()[i]->Update();
+void Solver<Dtype>::ThreadSyncWithSVB(
+    shared_ptr<Layer<Dtype> >& layer, const int layer_id,
+    const vector<Blob<Dtype>*>& top, const vector<Blob<Dtype>*>& bottom) {
+  SufficientVector* sv = new SufficientVector(
+      top[0]->count() * sizeof(Dtype),
+      bottom[0]->count() * sizeof(Dtype));
+  switch (Caffe::mode()) {
+  case Caffe::CPU:
+    memcpy(sv->mutable_cpu_a(), top[0]->cpu_diff(), sv->a_size());
+    memcpy(sv->mutable_cpu_b(), bottom[0]->cpu_data(), sv->b_size());
+    break;
+  case Caffe::GPU:
+#ifndef CPU_ONLY
+    caffe_gpu_memcpy(sv->a_size(), top[0]->gpu_diff(), sv->mutable_cpu_a());
+    caffe_gpu_memcpy(sv->b_size(), bottom[0]->gpu_data(), sv->mutable_cpu_b());
+#else
+    NO_GPU;
+#endif
+    break;
+  default:
+    LOG(FATAL) << "Unknown caffe mode: " << Caffe::mode();
   }
-  // Read from recv buffer & do updates 
-  for (int i = 0; i < layer->blobs().size(); ++i) {
-    //layer->blobs()[i]->SyncWithPSTable(clock_counter_ - table_staleness_);
-  }
-  //LOG(INFO) << "sync thread end " << layer->layer_param().name();
+   
 }
 
 template <typename Dtype>
@@ -951,7 +1004,8 @@ void SGDSolver<Dtype>::RestoreSolverState(const SolverState& state) {
 
 template <typename Dtype>
 void NesterovSolver<Dtype>::ComputeUpdateValue(const int param_id) {
-   // TODO
+  // TODO
+  NOT_IMPLEMENTED;
 }
 
 template <typename Dtype>
@@ -1073,7 +1127,8 @@ void NesterovSolver<Dtype>::ComputeUpdateValue() {
 
 template <typename Dtype>
 void AdaGradSolver<Dtype>::ComputeUpdateValue(const int param_id) {
-   // TODO
+  // TODO
+  NOT_IMPLEMENTED; 
 }
 
 template <typename Dtype>

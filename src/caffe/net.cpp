@@ -372,10 +372,8 @@ const int Net<Dtype>::InitPS(const NetParameter& in_param,
            "the number of the layer's parameter blobs: " << num_param_blobs;
 
     // use SVB for inner_product layers
-    util::Context& context = util::Context::get_instance();
-    const bool svb = context.get_bool("svb");
-    if (svb && layer_param.type() == LayerParameter_LayerType_INNER_PRODUCT) {
-      context.set_use_svb();
+    if (layer_param.type() == LayerParameter_LayerType_INNER_PRODUCT) {
+      util::Context::set_use_svb(true);
     }
   }
   // In the end, all remaining blobs are considered output blobs.

@@ -22,10 +22,21 @@ Context::Context() {
     ctx_[flag.name] = flag.is_default ? flag.default_value : flag.current_value;
   }
 
-  num_app_threads_ = get_int32("num_table_threads");
+  num_app_threads_ = get_int32("num_table_threads") - 1;
   num_rows_per_table_ = get_int32("num_rows_per_table");
   use_svb_ = false;
   svb_completed_ = false;
+}
+
+// -------------------- SVB -------------------------
+
+void Context::InitSVB(const int num_layers) {
+  for (int i = 0; i < num_layers; ++i) {
+    send_buffer_.push_back(new caffe::SufficientVectorQueue(1));
+  }
+  for (int i = 0; i < num_layers; ++i) {
+    recv_buffer_.push_back(new caffe::SufficientVectorQueue(num_app_threads_));
+  }
 }
 
 // -------------------- Getters ----------------------

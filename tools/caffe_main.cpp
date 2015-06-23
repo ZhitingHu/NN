@@ -149,6 +149,9 @@ int train() {
       caffe_engine(new caffe::CaffeEngine<float>(solver_param));
 
   petuum::PSTableGroup::CreateTableDone();
+  if (FLAGS_num_clients <= 1 || !FLAGS_svb) {
+    util::Context::set_use_svb(false);
+  } 
 
   // Train
   const int num_app_threads = FLAGS_num_table_threads - 1;
