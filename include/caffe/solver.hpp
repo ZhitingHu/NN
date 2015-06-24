@@ -44,14 +44,15 @@ class Solver {
   // PreSolve is run before any solving iteration starts, allowing one to
   // put up some scaffold.
   virtual void PreSolve() {}
-  Dtype ForwardBackward(const vector<Blob<Dtype>* >& bottom);
+  virtual void InitSVB();
+  virtual Dtype ForwardBackward(const vector<Blob<Dtype>* >& bottom);
   // Get the update value for the current iteration.
   virtual void ComputeUpdateValue(const int param_id) = 0;
   virtual void ComputeUpdateValue() = 0;
   virtual void ThreadSyncWithPS(const shared_ptr<Blob<Dtype> >& param,
       const int param_id, const int param_owner, const int clock);
   virtual void ThreadSyncWithSVB(
-    shared_ptr<Layer<Dtype> >& layer, const int layer_id,
+    const shared_ptr<Blob<Dtype> >& param, const int layer_id,
     const vector<Blob<Dtype>*>& top, const vector<Blob<Dtype>*>& bottom);
   virtual void JoinSyncThreads();
 
@@ -81,11 +82,13 @@ class Solver {
   int display_counter_;
   int test_counter_;
   int clock_counter_;
-  int table_staleness_;
+  int param_table_staleness_;
   // layer/net_name => vector of blobs' global indexes 
   const map<string, vector<int> >* layer_blobs_global_idx_ptr_; 
 
   vector<std::thread*> sync_threads_;
+  int max_local_sv_updates_;
+  int max_remote_sv_updates_;
 
   const int thread_id_;
   int client_id_;

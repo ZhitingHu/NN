@@ -49,6 +49,8 @@ DEFINE_int32(num_rows_per_table, 1,
     "Number of rows per parameter table.");
 DEFINE_bool(svb, true, 
     "True to use SVB for inner_product layers");
+DEFINE_int32(svb_timeout_ms, 10, 
+    "Milliseconds the svb receiver waits for");
 
 // Caffe Parameters
 DEFINE_int32(gpu, -1,
@@ -149,8 +151,8 @@ int train() {
       caffe_engine(new caffe::CaffeEngine<float>(solver_param));
 
   petuum::PSTableGroup::CreateTableDone();
-  if (FLAGS_num_clients <= 1 || !FLAGS_svb) {
-    util::Context::set_use_svb(false);
+  if (FLAGS_num_clients > 1 && FLAGS_svb && util::Context::num_ip_layers() > 0) {
+    util::Context::set_use_svb(true);
   } 
 
   // Train
@@ -162,20 +164,20 @@ int train() {
     thr = std::thread(
         &caffe::CaffeEngine<float>::Start, std::ref(*caffe_engine));
   }
-  //petuum::PSTableGroup::WaitThreadRegister();
     // SVB
   std::thread svb_worker_thread;
   if (util::Context::use_svb()) {
-    shared_ptr<caffe::SVBWorker> svb_worker(new caffe::SVBWorker());
+    shared_ptr<caffe::SVBWorker<float> > 
+        svb_worker(new caffe::SVBWorker<float>());
     svb_worker_thread = std::thread(
-        &caffe::SVBWorker::Start, std::ref(*svb_worker));
+        &caffe::SVBWorker<float>::Start, std::ref(*svb_worker));
   }
 
   // Finish
   for (auto& thr : threads) {
     thr.join();
   }
-  util::Context::set_sev_completed();
+  util::Context::set_svb_completed(true);
   svb_worker_thread.join();
   LOG(INFO) << "Optimization Done.";
 

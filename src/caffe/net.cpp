@@ -322,6 +322,7 @@ const int Net<Dtype>::InitPS(const NetParameter& in_param,
   bottom_vecs_.resize(param.layers_size());
   top_vecs_.resize(param.layers_size());
   int table_id = 0;
+  int num_ip_layers = 0;
   for (int layer_id = 0; layer_id < param.layers_size(); ++layer_id) {
     const LayerParameter& layer_param = param.layers(layer_id);
     layers_.push_back(shared_ptr<Layer<Dtype> >(GetLayer<Dtype>(layer_param)));
@@ -373,9 +374,11 @@ const int Net<Dtype>::InitPS(const NetParameter& in_param,
 
     // use SVB for inner_product layers
     if (layer_param.type() == LayerParameter_LayerType_INNER_PRODUCT) {
-      util::Context::set_use_svb(true);
+      ++num_ip_layers;
     }
   }
+  util::Context::set_num_ip_layers(num_ip_layers);
+
   // In the end, all remaining blobs are considered output blobs.
   for (set<string>::iterator it = available_blobs.begin();
       it != available_blobs.end(); ++it) {

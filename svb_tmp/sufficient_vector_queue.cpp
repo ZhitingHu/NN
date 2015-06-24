@@ -7,19 +7,22 @@
 
 namespace caffe {
 
-SufficientVectorQueue::~SufficientVectorQueue() {
+template<typename Dtype>
+SufficientVectorQueue<Dtype>::~SufficientVectorQueue() {
   while(!sv_queue_.empty()) {
     delete sv_queue_.front();
     sv_queue_.pop();
   }
 }
 
-void SufficientVectorQueue::Add(SufficientVector* v) {
+template<typename Dtype>
+void SufficientVectorQueue<Dtype>::Add(SufficientVector* v) {
   std::unique_lock<std::mutex> lock(mtx_);
   sv_queue_.push(v);
 }
 
-bool SufficientVectorQueue::Get(SufficientVector* v) {
+template<typename Dtype>
+bool SufficientVectorQueue<Dtype>::Get(SufficientVector* v) {
   std::unique_lock<std::mutex> lock(mtx_);
   if (sv_queue_.empty()) {
     return false;
@@ -40,7 +43,7 @@ bool SufficientVectorQueue::Get(SufficientVector* v) {
 }
 
 template<typename Dtype>
-bool SufficientVectorQueue::Get(SVProto* v) {
+bool SufficientVectorQueue<Dtype>::Get(SVProto* v) {
   std::unique_lock<std::mutex> lock(mtx_);
   if (sv_queue_.empty()) {
     return false;
@@ -57,7 +60,6 @@ bool SufficientVectorQueue::Get(SVProto* v) {
   return true;
 }
 
-template bool SufficientVectorQueue::Get<float>(SVProto*);
-template bool SufficientVectorQueue::Get<double>(SVProto*);
+INSTANTIATE_CLASS(SufficientVectorQueue);
 
 }  // namespace caffe

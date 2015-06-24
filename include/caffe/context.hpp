@@ -33,19 +33,32 @@ public:
 
   // SVB
   static bool svb_completed() { return get_instance().svb_completed_; }
-  static void set_sev_completed() { get_instance().svb_completed_ = true; }
+  static void set_svb_completed(const bool value) { 
+    get_instance().svb_completed_ = value; 
+  }
   static bool use_svb() { return get_instance().use_svb_; }
   static void set_use_svb(const bool value) { get_instance().use_svb_ = value; }
-  static caffe::SufficientVectorQueue* get_send_buffer_(const int layer_id) {
-    CHECK_LT(layer_id, get_instance().send_buffer_.size());
-    return get_instance().send_buffer_[layer_id];
+  static int num_ip_layers() { return get_instance().num_ip_layers_; }
+  static void set_num_ip_layers(const int value) {
+    get_instance().num_ip_layers_ = value; 
+  } 
+  static std::vector<caffe::SufficientVectorQueue*>& local_sv_queues() {
+    return get_instance().local_sv_queues_;
   }
-  static caffe::SufficientVectorQueue* get_recv_buffer_(const int layer_id) {
-    CHECK_LT(layer_id, get_instance().recv_buffer_.size());
-    return get_instance().recv_buffer_[layer_id];
+  static std::vector<caffe::SufficientVectorQueue*>& remote_sv_queues() {
+    return get_instance().remote_sv_queues_;
+  }
+  static caffe::SufficientVectorQueue* local_sv_queue(const int layer_id) {
+    CHECK_LT(layer_id, get_instance().local_sv_queues_.size());
+    return get_instance().local_sv_queues_[layer_id];
+  }
+  static caffe::SufficientVectorQueue* remote_sv_queue(const int layer_id) {
+    CHECK_LT(layer_id, get_instance().remote_sv_queues_.size());
+    return get_instance().remote_sv_queues_[layer_id];
   }
   void InitSVB(const int num_layers);
-
+  
+  //
   static std::vector<boost::shared_ptr<leveldb::DB> >& test_dbs() { 
     return get_instance().test_dbs_; 
   }
@@ -71,8 +84,9 @@ private:
   int num_app_threads_;
   int num_rows_per_table_;
 
-  std::vector<caffe::SufficientVectorQueue*> send_buffer_;
-  std::vector<caffe::SufficientVectorQueue*> recv_buffer_;
+  std::vector<caffe::SufficientVectorQueue*> local_sv_queues_;
+  std::vector<caffe::SufficientVectorQueue*> remote_sv_queues_;
+  int num_ip_layers_;
   bool use_svb_;
   bool svb_completed_;
 

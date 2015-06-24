@@ -136,6 +136,7 @@ class Blob {
   Dtype* mutable_gpu_diff();
   void Update();
   void Update(const Dtype* update);
+  void Update(const SufficientVector* v);
   void SyncWithPSTable(const int clock);
 
   void FromProto(const BlobProto& proto, const bool init_ps_table = false);

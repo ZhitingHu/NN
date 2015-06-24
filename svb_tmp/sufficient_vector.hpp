@@ -14,30 +14,29 @@ namespace caffe {
 /**
  * @brief 
  */
+template <typename Dtype>
 class SufficientVector {
  public:
   explicit SufficientVector(const size_t a_size, const size_t b_size,
       const int layer_id);
-  SufficientVector() : a_size_(0), b_size_(0), layer_id_(-1) {}
+  explicit SufficientVector();
   ~SufficientVector();
 
   void Reshape(const size_t a_size, const size_t b_size);
 
   inline int layer_id() { return layer_id_; } 
-  const void* cpu_a() const;
-  const void* gpu_a() const;
-  const void* cpu_b() const;
-  const void* gpu_b() const;
+  const Dtype* cpu_a() const;
+  const Dtype* gpu_a() const;
+  const Dtype* cpu_b() const;
+  const Dtype* gpu_b() const;
   inline size_t a_size() const { return a_size_; }
   inline size_t b_size() const { return b_size_; }
-  void* mutable_cpu_a();
-  void* mutable_gpu_a();
-  void* mutable_cpu_b();
-  void* mutable_gpu_b();
+  Dtype* mutable_cpu_a();
+  Dtype* mutable_gpu_a();
+  Dtype* mutable_cpu_b();
+  Dtype* mutable_gpu_b();
   
-  template <typename Dtype>
   void FromProto(const SVProto& proto);
-  template <typename Dtype>
   void ToProto(SVProto* proto) const;
 
  private:

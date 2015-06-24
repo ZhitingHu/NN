@@ -4,18 +4,21 @@
 
 namespace caffe {
 
-SufficientVector::SufficientVector(
+template <typename Dtype>
+SufficientVector<Dtype>::SufficientVector(
     const size_t a_size, const size_t b_size, const int layer_id) {
   Reshape(a_size, b_size);
   layer_id_ = layer_id;
 }
 
-SufficientVector::~SufficientVector() {
+template <typename Dtype>
+SufficientVector<Dtype>::~SufficientVector() {
   a_.reset();
   b_.reset();
 }
 
-void SufficientVector::Reshape(
+template <typename Dtype>
+void SufficientVector<Dtype>::Reshape(
     const size_t a_size, const size_t b_size) {
   CHECK_GE(a_size, 0);
   CHECK_GE(b_size, 0);
@@ -25,43 +28,51 @@ void SufficientVector::Reshape(
   b_.reset(new SyncedMemory(b_size_));
 }
 
-const void* SufficientVector::cpu_a() const {
+template <typename Dtype>
+const Dtype* SufficientVector<Dtype>::cpu_a() const {
   CHECK(a_);
   return a_->cpu_data();
 }
-const void* SufficientVector::gpu_a() const {
+template <typename Dtype>
+const Dtype* SufficientVector<Dtype>::gpu_a() const {
   CHECK(a_);
   return a_->gpu_data();
 }
-const void* SufficientVector::cpu_b() const {
+template <typename Dtype>
+const Dtype* SufficientVector<Dtype>::cpu_b() const {
   CHECK(b_);
   return b_->cpu_data();
 }
-const void* SufficientVector::gpu_b() const {
+template <typename Dtype>
+const Dtype* SufficientVector<Dtype>::gpu_b() const {
   CHECK(b_);
   return b_->gpu_data();
 }
 
-void* SufficientVector::mutable_cpu_a() {
+template <typename Dtype>
+void* SufficientVector<Dtype>::mutable_cpu_a() {
   CHECK(a_);
   return a_->mutable_cpu_data();
 }
-void* SufficientVector::mutable_gpu_a() {
+template <typename Dtype>
+void* SufficientVector<Dtype>::mutable_gpu_a() {
   CHECK(a_);
   return a_->mutable_gpu_data();
 }
-void* SufficientVector::mutable_cpu_b() {
+template <typename Dtype>
+void* SufficientVector<Dtype>::mutable_cpu_b() {
   CHECK(b_);
   return b_->mutable_cpu_data();
 }
-void* SufficientVector::mutable_gpu_b() {
+template <typename Dtype>
+void* SufficientVector<Dtype>::mutable_gpu_b() {
   CHECK(b_);
   return b_->mutable_gpu_data();
 }
 
 template <typename Dtype>
-void SufficientVector::FromProto(const SVProto& proto) {
-  Reshape(proto.a_size(), proto.b_size());
+void SufficientVector<Dtype>::FromProto(const SVProto& proto) {
+  Reshape(a_size, b_size);
   layer_id_ = proto.layer_id();
 
   Dtype* a_vec = static_cast<Dtype*>(mutable_cpu_a());
@@ -74,12 +85,8 @@ void SufficientVector::FromProto(const SVProto& proto) {
   }
 }
 
-template void SufficientVector::FromProto<float>(const SVProto&);
-template void SufficientVector::FromProto<double>(const SVProto&);
-
-
 template<typename Dtype>
-void SufficientVector::ToProto(SVProto* proto) const {
+void SufficientVector<Dtype>::ToProto(SVProto* proto) const {
   proto->set_layer_id(layer_id_);
   proto->clear_a();
   proto->clear_b();
@@ -87,16 +94,14 @@ void SufficientVector::ToProto(SVProto* proto) const {
   for (int i = 0; i < a_size_ / sizeof(Dtype); ++i) {
     proto->add_a(a_vec[i]);
   }
-  LOG(ERROR) << "----------------------------------------------\n" 
-      << a_size_ / sizeof(Dtype) << "\t" << proto->a_size() << "\t" << a_size_ << "\t" << sizeof(Dtype)
-      << "---------------------------------------------------\n";
   const Dtype* b_vec = static_cast<const Dtype*>(cpu_b());
   for (int i = 0; i < b_size_ / sizeof(Dtype); ++i) {
     proto->add_b(b_vec[i]);
   }
 }
 
-template void SufficientVector::ToProto<float>(SVProto*) const;
-template void SufficientVector::ToProto<double>(SVProto*) const;
+INSTANTIATE_CLASS(SufficientVector);
+template class SufficientVector<int>;
+template class SufficientVector<unsigned int>;
 
 }  // namespace caffe

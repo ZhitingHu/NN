@@ -2,6 +2,13 @@ syntax = "proto2";
 
 package caffe;
 
+// Sufficient Vector
+message SVProto {
+  optional int32 layer_id = 1;
+  repeated float a = 2;
+  repeated float b = 3;
+}
+
 message BlobProto {
   optional int32 num = 1 [default = 0];
   optional int32 channels = 2 [default = 0];

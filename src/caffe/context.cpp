@@ -32,10 +32,12 @@ Context::Context() {
 
 void Context::InitSVB(const int num_layers) {
   for (int i = 0; i < num_layers; ++i) {
-    send_buffer_.push_back(new caffe::SufficientVectorQueue(1));
+    local_sv_queues_.push_back(
+        new caffe::SufficientVectorQueue(num_app_threads_ + 1));
   }
   for (int i = 0; i < num_layers; ++i) {
-    recv_buffer_.push_back(new caffe::SufficientVectorQueue(num_app_threads_));
+    remote_sv_queues_.push_back(
+        new caffe::SufficientVectorQueue(num_app_threads_));
   }
 }
 

@@ -64,6 +64,26 @@ void caffe_set(const int N, const Dtype alpha, Dtype* Y) {
   }
 }
 
+// X + alpha * ab^{T}
+// X: M x N
+// a: M
+// b: N
+template <>
+void caffe_cpu_xpasv<double>(const int M, const int N, const double alpha,
+    double* X, const double* a, const double* b) {
+  for (int i = 0; i < M; ++i) {
+    cblas_daxpy(N, alpha * a[i], b, 1, X + i * N, 1);
+  }
+}
+
+template <>
+void caffe_cpu_xpasv<float>(const int M, const int N, const float alpha,
+    float* X, const float* a, const float* b) {
+  for (int i = 0; i < M; ++i) {
+    cblas_saxpy(N, alpha * a[i], b, 1, X + i * N, 1);
+  }
+}
+
 template void caffe_set<int>(const int N, const int alpha, int* Y);
 template void caffe_set<float>(const int N, const float alpha, float* Y);
 template void caffe_set<double>(const int N, const double alpha, double* Y);

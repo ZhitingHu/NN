@@ -38,7 +38,7 @@ template <typename Dtype>
 CaffeEngine<Dtype>::CaffeEngine(const NetParameter& net_param) : 
     net_(), num_tables_(0), thread_counter_(0) {
   util::Context& context = util::Context::get_instance();
-  const int num_threads = context.get_int32("num_table_threads");
+  const int num_threads = context.num_app_threads();
   Caffe::initialize_phases(num_threads);
 
   net_param_ = net_param;
@@ -59,7 +59,7 @@ void CaffeEngine<Dtype>::Init(const SolverParameter& param) {
   }
   util::Context& context = util::Context::get_instance();
   loss_table_staleness_ = context.get_int32("loss_table_staleness");
-  const int num_threads = context.get_int32("num_table_threads");
+  const int num_threads = context.num_app_threads();
   Caffe::initialize_phases(num_threads);
 
   // Scaffolding code

@@ -239,9 +239,48 @@ void Blob<Dtype>::Update() {
   }
 }
 
+template <> void Blob<unsigned int>::Update(
+    const unsigned int* update) { NOT_IMPLEMENTED; }
+template <> void Blob<int>::Update(const int* update) { NOT_IMPLEMENTED; }
+
 template <typename Dtype>
 void Blob<Dtype>::Update(const Dtype* update) {
   UpdatePSTable(update);
+}
+
+template <> void Blob<unsigned int>::Update(
+    const SufficientVector* v) { NOT_IMPLEMENTED; }
+template <> void Blob<int>::Update(
+    const SufficientVector* v) { NOT_IMPLEMENTED; }
+
+template <typename Dtype>
+void Blob<Dtype>::Update(const SufficientVector* v) {
+  CHECK_EQ(blob_mode_, BlobProto_BlobMode_GLOBAL);
+  CHECK_EQ(v->a_size(), height_);
+  CHECK_EQ(v->b_size(), width_);
+
+  // Use GPU for update if available
+  switch (Caffe::mode()) {
+  case Caffe::CPU:
+    caffe_cpu_xpasv(height_, width_, Dtype(-1),
+        static_cast<Dtype*>(data_->mutable_cpu_data()),
+        static_cast<const Dtype*>(v->cpu_a()),
+        static_cast<const Dtype*>(v->cpu_b()));
+    break;
+  case Caffe::GPU:
+#ifndef CPU_ONLY
+    // TODO
+    caffe_cpu_xpasv(height_, width_, Dtype(-1),
+        static_cast<Dtype*>(data_->mutable_cpu_data()),
+        static_cast<const Dtype*>(v->cpu_a()),
+        static_cast<const Dtype*>(v->cpu_b()));
+#else
+    NO_GPU;
+#endif
+    break;
+  default:
+    LOG(FATAL) << "Unknown caffe mode: " << Caffe::mode();
+  }
 }
 
 template <typename Dtype>

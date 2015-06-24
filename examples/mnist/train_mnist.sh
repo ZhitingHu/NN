@@ -30,6 +30,7 @@ loss_table_staleness=100
 num_comm_channels_per_client=1
 num_rows_per_table=1
 consistency_model="SSPPush"
+svb=true
 
 ##=====================================
 
@@ -45,7 +46,7 @@ num_unique_hosts=`cat $host_file | awk '{ print $2 }' | uniq | wc -l`
 output_dir=$app_dir/output
 output_dir="${output_dir}/caffe.${dataset}.S${param_table_staleness}"
 output_dir="${output_dir}.M${num_unique_hosts}"
-output_dir="${output_dir}.T${num_table_threads}"
+output_dir="${output_dir}.T${num_app_threads}"
 log_dir=$output_dir/logs
 net_outputs_prefix="${output_dir}/${dataset}"
 
@@ -83,7 +84,7 @@ for ip in $unique_host_list; do
       --loss_table_staleness $loss_table_staleness \
       --num_comm_channels_per_client $num_comm_channels_per_client \
       --num_rows_per_table $num_rows_per_table \
-      --svb=false \
+      --svb=$svb \
       --stats_path ${output_dir}/caffe_stats.yaml \
       --solver=${solver_filename} \
       --net_outputs=${net_outputs_prefix}" #\

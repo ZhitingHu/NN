@@ -42,9 +42,9 @@ template <typename Dtype>
 void Solver<Dtype>::Init(const SolverParameter& param) {
   util::Context& context = util::Context::get_instance();
   client_id_ = context.get_int32("client_id");
-  // #worker threads
-  num_threads_ = context.get_int32("num_table_threads");
+  num_threads_ = context.num_app_threads();
   num_clients_ = context.get_int32("num_clients");
+  param_table_staleness_ = context.get_int32("table_staleness");
 
   if (client_id_ == 0 && thread_id_ == 0) {
     LOG(INFO) << "Initializing solver from parameters: " << std::endl
@@ -234,6 +234,18 @@ void Solver<Dtype>::InitTestNets() {
   }
 }
 
+
+template <typename Dtype>
+void Solver<Dtype>::InitSVB() {
+  max_local_sv_updates_ = num_threads_ * param_table_staleness_;
+  max_remote_sv_updates_
+      = (num_clients_ - 1) * num_threads_ * param_table_staleness_;
+  if (thread_id_ == 0) {
+    util::Context& context = util::Context::get_instance();
+    context.InitSVB(net_->layers().size());
+  }
+}
+
 template <typename Dtype>
 void Solver<Dtype>::Solve(const char* resume_file) {
   Caffe::set_phase(Caffe::TRAIN, thread_id_);
@@ -241,6 +253,8 @@ void Solver<Dtype>::Solve(const char* resume_file) {
     LOG(INFO) << "Solving " << net_->name();
   }
   PreSolve();
+
+  util::Context& context = util::Context::get_instance();
 
   // Register net output tables  
   if (thread_id_ == 0) {
@@ -258,19 +272,22 @@ void Solver<Dtype>::Solve(const char* resume_file) {
       }
     }
   }
+  // Init SVB
+  if (context.use_svb()) {
+    InitSVB(); 
+  } 
 
   iter_ = 0;
+  // Restore if necessary
   if (resume_file) {
     if (client_id_ == 0 && thread_id_ == 0) {
       LOG(INFO) << "Restoring previous solver status from " << resume_file;
     }
     Restore(resume_file);
-    //petuum::PSTableGroup::GlobalBarrier();
     if (client_id_ == 0 && thread_id_ == 0) {
       LOG(INFO) << "Restoration done.";
     }
   }
-  petuum::PSTableGroup::GlobalBarrier();
 
   // Remember the initial iter_ value; will be non-zero if we loaded from a
   // resume_file above.
@@ -279,9 +296,6 @@ void Solver<Dtype>::Solve(const char* resume_file) {
   display_counter_ = 0;
   test_counter_ = 0;
   clock_counter_ = 0;
-  util::Context& context = util::Context::get_instance();
-  table_staleness_ = context.get_int32("table_staleness");
-  // for display
   total_timer_.restart();
   int count_temp = 0;
   const vector<Blob<Dtype>*>& output_temp = net_->output_blobs();
@@ -290,7 +304,10 @@ void Solver<Dtype>::Solve(const char* resume_file) {
   }
   vector<Dtype> output_cache(count_temp + caffe::kNumFixedCols);
 
-  net_->SyncWithPS(clock_counter_ - table_staleness_);
+  // Synchronize
+  petuum::PSTableGroup::GlobalBarrier();
+  net_->SyncWithPS(clock_counter_ - param_table_staleness_);
+
   // For a network that is trained by the solver, no bottom or top vecs
   // should be given, and we will just provide dummy vecs.
   vector<Blob<Dtype>*> bottom_vec;
@@ -298,7 +315,7 @@ void Solver<Dtype>::Solve(const char* resume_file) {
     
     //float syn_start_time = total_timer_.elapsed();
     //LOG(INFO) << "syn ";
-    //net_->SyncWithPS(clock_counter_ - table_staleness_);
+    //net_->SyncWithPS(clock_counter_ - param_table_staleness_);
     //LOG(INFO) << "syn done\t" << client_id_ << "\t" << total_timer_.elapsed() - syn_start_time;
     //LOG(INFO) << "join " << client_id_;
     float join_start_time = total_timer_.elapsed();
@@ -452,12 +469,12 @@ Dtype Solver<Dtype>::ForwardBackward(const vector<Blob<Dtype>* >& bottom) {
           if (util::Context::use_svb()
               && type == LayerParameter_LayerType_INNER_PRODUCT
               && j == 0) { // weights of a inner product layer
-            // TODO
-            NOT_IMPLEMENTED;
+            sync_thread = new std::thread(&Solver::ThreadSyncWithSVB, this, 
+                net_->params()[param_id], i, top_vecs[i], bottom_vecs[i]);
           } else {
             sync_thread = new std::thread(&Solver::ThreadSyncWithPS, this, 
                 net_->params()[param_id], param_id, param_owner,
-                clock_counter_ - table_staleness_);
+                clock_counter_ - param_table_staleness_);
           }
           sync_threads_.push_back(sync_thread);
         }
@@ -466,7 +483,7 @@ Dtype Solver<Dtype>::ForwardBackward(const vector<Blob<Dtype>* >& bottom) {
 
         // Create thread for sync
         //std::thread* sync_thread = new std::thread(&Solver::ThreadSyncWithPS, this, 
-        //    layers[i], clock_counter_ - table_staleness_);
+        //    layers[i], clock_counter_ - param_table_staleness_);
         //if (client_id_ == 1)
         //  LOG(INFO) << "back sync " << layers[i]->layer_param().name() << " done " << client_id_;
       }
@@ -506,11 +523,14 @@ void Solver<Dtype>::ThreadSyncWithPS(const shared_ptr<Blob<Dtype> >& param,
 /// This function is used for created thread to sync one (ip) layer through SVB
 template <typename Dtype>
 void Solver<Dtype>::ThreadSyncWithSVB(
-    shared_ptr<Layer<Dtype> >& layer, const int layer_id,
+    const shared_ptr<Blob<Dtype> >& param, const int layer_id,
     const vector<Blob<Dtype>*>& top, const vector<Blob<Dtype>*>& bottom) {
-  SufficientVector* sv = new SufficientVector(
-      top[0]->count() * sizeof(Dtype),
-      bottom[0]->count() * sizeof(Dtype));
+  SufficientVectorQueue* local_svq = util::Context::local_sv_queue(layer_id);
+  SufficientVectorQueue* remote_svq = util::Context::remote_sv_queue(layer_id);
+  const int sv_a_size = top[0]->count() * sizeof(Dtype);
+  const int sv_b_size = bottom[0]->count() * sizeof(Dtype);
+  // Push updates
+  SufficientVector* sv = new SufficientVector(sv_a_size, sv_b_size, layer_id);
   switch (Caffe::mode()) {
   case Caffe::CPU:
     memcpy(sv->mutable_cpu_a(), top[0]->cpu_diff(), sv->a_size());
@@ -527,7 +547,26 @@ void Solver<Dtype>::ThreadSyncWithSVB(
   default:
     LOG(FATAL) << "Unknown caffe mode: " << Caffe::mode();
   }
-   
+  
+  local_svq->Add(sv); 
+
+  // Sync
+  int local_updates = 0;
+  while (local_updates++ < max_local_sv_updates_) {
+    SufficientVector* v = new SufficientVector(sv_a_size, sv_b_size, layer_id);
+    bool succ = local_svq->Get(v);
+    if (!succ) break;
+    param->Update(v);
+    delete v;
+  }
+  int remote_updates = 0; 
+  while (remote_updates++ < max_remote_sv_updates_) {
+    SufficientVector* v;
+    bool succ = remote_svq->Get(v);
+    if (!succ) break;
+    param->Update(v); 
+    delete v;
+  }
 }
 
 template <typename Dtype>

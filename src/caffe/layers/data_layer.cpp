@@ -143,7 +143,7 @@ template <typename Dtype>
 void DataLayer<Dtype>::InitializeDB() {
   util::Context& context = util::Context::get_instance();
   const int num_clients = context.get_int32("num_clients");
-  const int num_threads = context.get_int32("num_table_threads");
+  const int num_threads = context.num_app_threads();
   const int client_id = context.get_int32("client_id");
   shared_file_system_ = this->layer_param_.data_param().shared_file_system();
 

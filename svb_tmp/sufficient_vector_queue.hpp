@@ -14,19 +14,19 @@ using std::queue;
 /**
  * @brief 
  */
+template<typename Dtype>
 class SufficientVectorQueue {
  public:
   SufficientVectorQueue(const int max_read_count)
       : read_count_(0), max_read_count_(max_read_count) { }
   ~SufficientVectorQueue();
 
-  void Add(SufficientVector* v);
-  bool Get(SufficientVector* v);
-  template<typename Dtype>
+  void Add(SufficientVector<Dtype>* v);
+  bool Get(SufficientVector<Dtype>* v);
   bool Get(SVProto* v);
 
  private:
-  queue<SufficientVector*> sv_queue_;
+  queue<SufficientVector<Dtype>*> sv_queue_;
   int read_count_; // the number of times the front sv is read
   const int max_read_count_;
   std::mutex mtx_;

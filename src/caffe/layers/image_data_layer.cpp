@@ -28,7 +28,7 @@ void ImageDataLayer<Dtype>::DataLayerSetUp(const vector<Blob<Dtype>*>& bottom,
       "new_height and new_width to be set at the same time.";
   util::Context& context = util::Context::get_instance();
   const int client_id = context.get_int32("client_id");
-  const int num_threads = context.get_int32("num_table_threads");
+  const int num_threads = context.num_app_threads();
   string filename;
   int label;
   // Read the file with filenames and labels
