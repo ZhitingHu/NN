@@ -10,6 +10,7 @@
 #include "caffe/proto/caffe.pb.h"
 #include "caffe/util/device_alternate.hpp"
 #include "caffe/filler.hpp"
+#include "caffe/sufficient_vector.hpp"
 
 namespace caffe {
 
@@ -157,6 +158,12 @@ class Layer {
       const vector<bool>& propagate_down,
       vector<Blob<Dtype>*>* bottom);
   
+  /*
+   * Compute gradients of weights based on sufficient vector
+   * Applied to inner_product layer
+   */
+  inline void ComputeGradientFromSV(const SufficientVector* v);
+
   /**
    * @brief Returns the vector of learnable parameter blobs.
    */
@@ -362,6 +369,12 @@ class Layer {
     Backward_cpu(top, propagate_down, bottom);
   }
 
+  virtual void ComputeGradientFromSV_cpu(const SufficientVector* v) {}
+  virtual void ComputeGradientFromSV_gpu(const SufficientVector* v) {
+    // LOG(WARNING) << "Using CPU code as backup.";
+    ComputeGradientFromSV_cpu(v); 
+  }
+
   /**
    * Called by the parent Layer's SetUp to check that the number of bottom
    * and top Blobs provided as input match the expected numbers specified by
@@ -534,6 +547,20 @@ inline void Layer<Dtype>::Backward(const vector<Blob<Dtype>*>& top,
     break;
   case Caffe::GPU:
     Backward_gpu(top, propagate_down, bottom);
+    break;
+  default:
+    LOG(FATAL) << "Unknown caffe mode.";
+  }
+}
+
+template <typename Dtype>
+inline void Layer<Dtype>::ComputeGradientFromSV(const SufficientVector* v) {
+  switch (Caffe::mode()) {
+  case Caffe::CPU:
+    this->ComputeGradientFromSV_cpu(v);
+    break;
+  case Caffe::GPU:
+    this->ComputeGradientFromSV_gpu(v);
     break;
   default:
     LOG(FATAL) << "Unknown caffe mode.";

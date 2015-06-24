@@ -52,7 +52,8 @@ class Solver {
   virtual void ThreadSyncWithPS(const shared_ptr<Blob<Dtype> >& param,
       const int param_id, const int param_owner, const int clock);
   virtual void ThreadSyncWithSVB(
-    const shared_ptr<Blob<Dtype> >& param, const int layer_id,
+    const shared_ptr<Blob<Dtype> >& param,
+    const shared_ptr<Layer<Dtype> >& layer, const int layer_id,
     const vector<Blob<Dtype>*>& top, const vector<Blob<Dtype>*>& bottom);
   virtual void JoinSyncThreads();
 

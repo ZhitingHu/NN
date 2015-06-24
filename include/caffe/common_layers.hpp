@@ -283,6 +283,9 @@ class InnerProductLayer : public Layer<Dtype> {
       const vector<bool>& propagate_down, vector<Blob<Dtype>*>* bottom);
   virtual void Backward_gpu(const vector<Blob<Dtype>*>& top,
       const vector<bool>& propagate_down, vector<Blob<Dtype>*>* bottom);
+  // SVB
+  virtual void ComputeGradientFromSV_cpu(const SufficientVector* v);
+  virtual void ComputeGradientFromSV_gpu(const SufficientVector* v);
 
   int M_;
   int K_;

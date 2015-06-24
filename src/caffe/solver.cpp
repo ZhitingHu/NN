@@ -470,7 +470,8 @@ Dtype Solver<Dtype>::ForwardBackward(const vector<Blob<Dtype>* >& bottom) {
               && type == LayerParameter_LayerType_INNER_PRODUCT
               && j == 0) { // weights of a inner product layer
             sync_thread = new std::thread(&Solver::ThreadSyncWithSVB, this, 
-                net_->params()[param_id], i, top_vecs[i], bottom_vecs[i]);
+                net_->params()[param_id], layers[i], i, top_vecs[i],
+                bottom_vecs[i]);
           } else {
             sync_thread = new std::thread(&Solver::ThreadSyncWithPS, this, 
                 net_->params()[param_id], param_id, param_owner,
@@ -506,12 +507,12 @@ void Solver<Dtype>::ThreadSyncWithPS(const shared_ptr<Blob<Dtype> >& param,
 
   if (param_owner < 0) {
     // Push updates to PS
-    param->Update();
+    param->UpdatePSTable();
     // Read fresh values from PS
     param->SyncWithPSTable(clock);
   } else {
     // Push updates to PS
-    net_->params()[param_owner]->Update(param->cpu_diff());
+    net_->params()[param_owner]->UpdatePSTable(param->cpu_diff());
     // Read fresh values from PS
     net_->params()[param_owner]->SyncWithPSTable(clock);
   }
@@ -523,7 +524,8 @@ void Solver<Dtype>::ThreadSyncWithPS(const shared_ptr<Blob<Dtype> >& param,
 /// This function is used for created thread to sync one (ip) layer through SVB
 template <typename Dtype>
 void Solver<Dtype>::ThreadSyncWithSVB(
-    const shared_ptr<Blob<Dtype> >& param, const int layer_id,
+    const shared_ptr<Blob<Dtype> >& param,
+    const shared_ptr<Layer<Dtype> >& layer, const int layer_id,
     const vector<Blob<Dtype>*>& top, const vector<Blob<Dtype>*>& bottom) {
   SufficientVectorQueue* local_svq = util::Context::local_sv_queue(layer_id);
   SufficientVectorQueue* remote_svq = util::Context::remote_sv_queue(layer_id);
@@ -556,7 +558,8 @@ void Solver<Dtype>::ThreadSyncWithSVB(
     SufficientVector* v = new SufficientVector(sv_a_size, sv_b_size, layer_id);
     bool succ = local_svq->Get(v);
     if (!succ) break;
-    param->Update(v);
+    layer->ComputeGradientFromSV(v);
+    param->Update();
     delete v;
   }
   int remote_updates = 0; 
@@ -564,7 +567,8 @@ void Solver<Dtype>::ThreadSyncWithSVB(
     SufficientVector* v;
     bool succ = remote_svq->Get(v);
     if (!succ) break;
-    param->Update(v); 
+    layer->ComputeGradientFromSV(v);
+    param->Update(); 
     delete v;
   }
 }

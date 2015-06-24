@@ -126,7 +126,8 @@ void SVBWorker<Dtype>::Send() {
           << vp->a_size() << "\t" << vp->b_size();
       for (int dst = 0; dst < host_map_.size(); dst++) {
         if (dst == client_id_) continue; // cannot send to myself
-        comm_bus_->SendInterProc(dst, msg_str.c_str(), msg_str.size());
+        size_t sz = comm_bus_->SendInterProc(dst, msg_str.c_str(), msg_str.size());
+        CHECK_EQ(sz, msg_str.size());
       }
       delete vp;
     }
@@ -150,10 +151,14 @@ void SVBWorker<Dtype>::Receive() {
     bool succ = comm_bus_->RecvInterProcTimeOut(&sender_id, &msg, timeout_ms_);
     if (!succ) continue;
     // parse
-    string msg_str(reinterpret_cast<char*>(msg.data()));
+    //string msg_str(reinterpret_cast<char*>(msg.data()));
+    //SVProto vp;
+    //CHECK(vp.ParseFromString(msg_str)) << "SVB message parsing error\n"
+    //    << msg_str << "\n" << msg_str.size();
     SVProto vp;
-    CHECK(vp.ParseFromString(msg_str)) << "SVB message parsing error\n"
-        << msg_str << "\n" << msg_str.size();
+    CHECK(vp.ParseFromArray(msg.data(), msg.size())) << "SVB message parsing error\n"
+        << msg.size();
+    LOG(INFO) << "recv succ " << vp.layer_id();
     // add to the remote-sv queue
     SufficientVector* v = new SufficientVector();
     v->FromProto<Dtype>(vp);

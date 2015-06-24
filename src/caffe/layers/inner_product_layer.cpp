@@ -99,7 +99,7 @@ template <typename Dtype>
 void InnerProductLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
     const vector<bool>& propagate_down,
     vector<Blob<Dtype>*>* bottom) {
-  if (this->param_propagate_down_[0]) {
+  if (this->param_propagate_down_[0] && !util::Context::use_svb()) {
     const Dtype* top_diff = top[0]->cpu_diff();
     const Dtype* bottom_data = (*bottom)[0]->cpu_data();
     // Gradient with respect to weight
@@ -120,6 +120,16 @@ void InnerProductLayer<Dtype>::Backward_cpu(const vector<Blob<Dtype>*>& top,
         top_diff, this->blobs_[0]->cpu_data(), (Dtype)0.,
         (*bottom)[0]->mutable_cpu_diff());
   }
+}
+
+template <typename Dtype>
+void InnerProductLayer<Dtype>::ComputeGradientFromSV_cpu(
+    const SufficientVector* v) {
+  // Gradient with respect to weight
+  const Dtype* top_diff = (const Dtype*)v->cpu_a();
+  const Dtype* bottom_data = (const Dtype*)v->cpu_b();
+  caffe_cpu_gemm<Dtype>(CblasTrans, CblasNoTrans, N_, K_, M_, (Dtype)1.,
+      top_diff, bottom_data, (Dtype)0., this->blobs_[0]->mutable_cpu_diff());
 }
 
 #ifdef CPU_ONLY

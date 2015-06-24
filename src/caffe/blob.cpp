@@ -211,84 +211,81 @@ template <> void Blob<int>::Update() { NOT_IMPLEMENTED; }
 
 template <typename Dtype>
 void Blob<Dtype>::Update() {
-  if (blob_mode_ == BlobProto_BlobMode_GLOBAL) {
-    UpdatePSTable();
-  } else {
-    // We will perform update based on where the data is located.
-    switch (data_->head()) {
-    case SyncedMemory::HEAD_AT_CPU:
-      // perform computation on CPU
-      caffe_axpy<Dtype>(count_, Dtype(-1),
-          static_cast<const Dtype*>(diff_->cpu_data()),
-          static_cast<Dtype*>(data_->mutable_cpu_data()));
-      break;
-    case SyncedMemory::HEAD_AT_GPU:
-    case SyncedMemory::SYNCED:
-#ifndef CPU_ONLY
-      // perform computation on GPU
-      caffe_gpu_axpy<Dtype>(count_, Dtype(-1),
-          static_cast<const Dtype*>(diff_->gpu_data()),
-          static_cast<Dtype*>(data_->mutable_gpu_data()));
-#else
-      NO_GPU;
-#endif
-      break;
-    default:
-      LOG(FATAL) << "Syncedmem not initialized.";
-    }
-  }
-}
-
-template <> void Blob<unsigned int>::Update(
-    const unsigned int* update) { NOT_IMPLEMENTED; }
-template <> void Blob<int>::Update(const int* update) { NOT_IMPLEMENTED; }
-
-template <typename Dtype>
-void Blob<Dtype>::Update(const Dtype* update) {
-  UpdatePSTable(update);
-}
-
-template <> void Blob<unsigned int>::Update(
-    const SufficientVector* v) { NOT_IMPLEMENTED; }
-template <> void Blob<int>::Update(
-    const SufficientVector* v) { NOT_IMPLEMENTED; }
-
-template <typename Dtype>
-void Blob<Dtype>::Update(const SufficientVector* v) {
-  CHECK_EQ(blob_mode_, BlobProto_BlobMode_GLOBAL);
-  CHECK_EQ(v->a_size(), height_);
-  CHECK_EQ(v->b_size(), width_);
-
-  // Use GPU for update if available
-  switch (Caffe::mode()) {
-  case Caffe::CPU:
-    caffe_cpu_xpasv(height_, width_, Dtype(-1),
-        static_cast<Dtype*>(data_->mutable_cpu_data()),
-        static_cast<const Dtype*>(v->cpu_a()),
-        static_cast<const Dtype*>(v->cpu_b()));
+  // We will perform update based on where the data is located.
+  switch (data_->head()) {
+  case SyncedMemory::HEAD_AT_CPU:
+    // perform computation on CPU
+    caffe_axpy<Dtype>(count_, Dtype(-1),
+        static_cast<const Dtype*>(diff_->cpu_data()),
+        static_cast<Dtype*>(data_->mutable_cpu_data()));
     break;
-  case Caffe::GPU:
+  case SyncedMemory::HEAD_AT_GPU:
+  case SyncedMemory::SYNCED:
 #ifndef CPU_ONLY
-    // TODO
-    caffe_cpu_xpasv(height_, width_, Dtype(-1),
-        static_cast<Dtype*>(data_->mutable_cpu_data()),
-        static_cast<const Dtype*>(v->cpu_a()),
-        static_cast<const Dtype*>(v->cpu_b()));
+    // perform computation on GPU
+    caffe_gpu_axpy<Dtype>(count_, Dtype(-1),
+        static_cast<const Dtype*>(diff_->gpu_data()),
+        static_cast<Dtype*>(data_->mutable_gpu_data()));
 #else
     NO_GPU;
 #endif
     break;
   default:
-    LOG(FATAL) << "Unknown caffe mode: " << Caffe::mode();
+    LOG(FATAL) << "Syncedmem not initialized.";
   }
 }
 
+//template <> void Blob<unsigned int>::Update(
+//    const unsigned int* update) { NOT_IMPLEMENTED; }
+//template <> void Blob<int>::Update(const int* update) { NOT_IMPLEMENTED; }
+//
+//template <typename Dtype>
+//void Blob<Dtype>::Update(const Dtype* update) {
+//  UpdatePSTable(update);
+//}
+//
+//template <> void Blob<unsigned int>::Update(
+//    const SufficientVector* v) { NOT_IMPLEMENTED; }
+//template <> void Blob<int>::Update(
+//    const SufficientVector* v) { NOT_IMPLEMENTED; }
+//
+//template <typename Dtype>
+//void Blob<Dtype>::Update(const SufficientVector* v) {
+//  CHECK_EQ(blob_mode_, BlobProto_BlobMode_GLOBAL);
+//  CHECK_EQ(v->a_size(), height_);
+//  CHECK_EQ(v->b_size(), width_);
+//
+//  // Use GPU for update if available
+//  switch (Caffe::mode()) {
+//  case Caffe::CPU:
+//    caffe_cpu_xpasv(height_, width_, Dtype(-1),
+//        static_cast<Dtype*>(data_->mutable_cpu_data()),
+//        static_cast<const Dtype*>(v->cpu_a()),
+//        static_cast<const Dtype*>(v->cpu_b()));
+//    break;
+//  case Caffe::GPU:
+//#ifndef CPU_ONLY
+//    // TODO
+//    caffe_cpu_xpasv(height_, width_, Dtype(-1),
+//        static_cast<Dtype*>(data_->mutable_cpu_data()),
+//        static_cast<const Dtype*>(v->cpu_a()),
+//        static_cast<const Dtype*>(v->cpu_b()));
+//#else
+//    NO_GPU;
+//#endif
+//    break;
+//  default:
+//    LOG(FATAL) << "Unknown caffe mode: " << Caffe::mode();
+//  }
+//}
+
 template <typename Dtype>
 void Blob<Dtype>::UpdatePSTable() {
+  CHECK_EQ(blob_mode_, BlobProto_BlobMode_GLOBAL);
+
   // flush diff_
   const Dtype* update = static_cast<const Dtype*>(diff_->cpu_data());
-  int update_idx = 0;
-  
+  int update_idx = 0;  
   for (int r = 0; r < util::Context::num_rows_per_table(); ++r) {
     petuum::UpdateBatch<Dtype> update_batch(global_table_row_capacity_);
     for (int i = 0; i < global_table_row_capacity_; ++i) {
@@ -303,8 +300,9 @@ void Blob<Dtype>::UpdatePSTable() {
 
 template <typename Dtype>
 void Blob<Dtype>::UpdatePSTable(const Dtype* update) {
+  CHECK_EQ(blob_mode_, BlobProto_BlobMode_GLOBAL);
+
   int update_idx = 0;
-  
   for (int r = 0; r < util::Context::num_rows_per_table(); ++r) {
     petuum::UpdateBatch<Dtype> update_batch(global_table_row_capacity_);
     for (int i = 0; i < global_table_row_capacity_; ++i) {
@@ -319,7 +317,7 @@ void Blob<Dtype>::UpdatePSTable(const Dtype* update) {
 
 template <typename Dtype>
 void Blob<Dtype>::SyncWithPSTable(const int clock) {
-  CHECK(blob_mode_ == BlobProto_BlobMode_GLOBAL);
+  CHECK_EQ(blob_mode_, BlobProto_BlobMode_GLOBAL);
   Dtype* data_temp = ReadPSTable(clock);
   data_->set_cpu_ps_data(data_temp);
 }

@@ -49,7 +49,7 @@ DEFINE_int32(num_rows_per_table, 1,
     "Number of rows per parameter table.");
 DEFINE_bool(svb, true, 
     "True to use SVB for inner_product layers");
-DEFINE_int32(svb_timeout_ms, 10, 
+DEFINE_int32(svb_timeout_ms, 1000, 
     "Milliseconds the svb receiver waits for");
 
 // Caffe Parameters
