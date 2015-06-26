@@ -90,7 +90,8 @@ for ip in $unique_host_list; do
       --net_outputs=${net_outputs_prefix}" #\
       #--snapshot=${snapshot_filename}"
 
-  ssh $ssh_options $ip $cmd &
+  #ssh $ssh_options $ip $cmd &
+  ssh $ssh_options $ip bash -c $cmd &
   #eval $cmd  # Use this to run locally (on one machine).
 
   # Wait a few seconds for the name node (client 0) to set up

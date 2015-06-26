@@ -189,6 +189,7 @@ void SVBWorker<Dtype>::Receive() {
     //LOG(INFO) << "client " << client_id_ << " fromproto done";
 
     CHECK_LT(v->layer_id(), remote_sv_queues_.size());
+    CHECK_GE(v->layer_id(), 0);
     remote_sv_queues_[v->layer_id()]->Add(v);
     //LOG(INFO) << "client " << client_id_ << " remote add done";
   }

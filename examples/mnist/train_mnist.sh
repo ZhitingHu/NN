@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash -u
 
 # Figure out the paths.
 script_path=`readlink -f $0`
@@ -64,15 +64,14 @@ for ip in $unique_host_list; do
   echo Running client $client_id on $ip
   log_path=${log_dir}.${client_id}
 
-  cmd="mkdir -p ${output_dir}; \
-      mkdir -p ${log_path}; \
-      setenv GLOG_logtostderr false; \
-      setenv GLOG_stderrthreshold 0; \
-      setenv GLOG_log_dir $log_path; \
-      setenv GLOG_v -1; \
-      setenv GLOG_minloglevel 0; \
-      setenv GLOG_vmodule ""; \
-      setenv LD_LIBRARY_PATH /usr/local/cuda/lib64; \
+  cmd="'ulimit -c unlimited; \
+      export LD_LIBRARY_PATH=/usr/local/cuda/lib64; \
+      GLOG_logtostderr=false \
+      GLOG_stderrthreshold=0 \
+      GLOG_log_dir=$log_path \
+      GLOG_v=-1 \
+      GLOG_minloglevel=0 \
+      GLOG_vmodule="" \
       $prog_path train \
       --consistency_model $consistency_model \
       --init_thread_access_table=true \
@@ -87,10 +86,10 @@ for ip in $unique_host_list; do
       --svb=$svb \
       --stats_path ${output_dir}/caffe_stats.yaml \
       --solver=${solver_filename} \
-      --net_outputs=${net_outputs_prefix}" #\
+      --net_outputs=${net_outputs_prefix}'" #\
       #--snapshot=${snapshot_filename}"
 
-  ssh $ssh_options $ip $cmd &
+  ssh $ssh_options $ip bash -c $cmd &
   #eval $cmd  # Use this to run locally (on one machine).
 
   # Wait a few seconds for the name node (client 0) to set up
