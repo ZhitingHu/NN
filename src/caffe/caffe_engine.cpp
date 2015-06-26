@@ -70,7 +70,9 @@ template <typename Dtype>
 void CaffeEngine<Dtype>::InitPS() {
   const int num_test_nets = GetNumTestNets();
   InitPSForTrainNet(num_test_nets + 1);
+  LOG(INFO) << "Init PS for train nets done";
   InitPSForTestNets(num_test_nets);
+  LOG(INFO) << "Init PS for test nets done";
 }
 
 template <typename Dtype>

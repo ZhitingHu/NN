@@ -92,7 +92,7 @@ void Blob<Dtype>::CreatePSTable() {
 
   //table_config.table_info.row_type = caffe::kDenseRowDtypeID;
   //table_config.table_info.table_staleness = param_table_staleness;
-  table_config.process_cache_capacity = num_rows_per_table;
+  table_config.process_cache_capacity = num_rows_per_table * 10;
   table_config.oplog_capacity = table_config.process_cache_capacity;
   table_config.thread_cache_capacity = 1;
   global_table_row_capacity_
@@ -334,7 +334,7 @@ Dtype* Blob<Dtype>::ReadPSTable(const int clock) const {
   for (int r_idx = 0; r_idx < util::Context::num_rows_per_table(); ++r_idx) {
     row_caches[r_idx].resize(global_table_row_capacity_);
     petuum::RowAccessor row_acc;
-    //LOG(INFO) << "get";
+    //LOG(INFO) << "get clock " << clock << " count " << count_ << " height " << height_ << " width " << width_ << " channel " << channels_ << " num " << num_;
     const auto& r = global_table_ptr_->template Get<petuum::DenseRow<Dtype> >(
         r_idx, &row_acc, clock);
     r.CopyToVector(&row_caches[r_idx]);

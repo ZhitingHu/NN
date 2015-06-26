@@ -71,9 +71,7 @@ class ConstantFiller : public Filler<Dtype> {
         ++update_idx;
         if (update_idx >= count) { break; }
       }
-      LOG(INFO) << "batch inc";
       blob->table()->BatchInc(r, update_batch);
-      LOG(INFO) << "batch inc done";
       if (update_idx >= count) { break; }
     }
     CHECK_EQ(this->filler_param_.sparse(), -1)
@@ -125,9 +123,7 @@ class UniformFiller : public Filler<Dtype> {
         ++update_idx;
         if (update_idx >= count) { break; }
       }
-      LOG(INFO) << "batch inc";
       blob->table()->BatchInc(r, update_batch);
-      LOG(INFO) << "batch inc done";
       if (update_idx >= count) { break; }
     }
 
@@ -173,9 +169,7 @@ class GaussianFiller : public Filler<Dtype> {
         ++update_idx;
         if (update_idx >= count) { break; }
       }
-      LOG(INFO) << "batch inc";
       blob->table()->BatchInc(r, update_batch);
-      LOG(INFO) << "batch inc done";
       if (update_idx >= count) { break; }
     }
 
@@ -252,9 +246,7 @@ class PositiveUnitballFiller : public Filler<Dtype> {
         ++update_idx;
         if (update_idx >= count) { break; }
       }
-      LOG(INFO) << "batch inc";
       blob->table()->BatchInc(r, update_batch);
-      LOG(INFO) << "batch inc done";
       if (update_idx >= count) { break; }
     }
 
@@ -337,38 +329,33 @@ class XavierFiller : public Filler<Dtype> {
     caffe_rng_uniform<Dtype>(blob->count(), -scale, scale, rn);
 
     int update_idx = 0;
-    //for (int r = 0; r < util::Context::num_rows_per_table(); ++r) {
-    //  petuum::UpdateBatch<Dtype> update_batch(global_table_row_capacity);
-    //  for (int i = 0; i < global_table_row_capacity; ++i) {
-    //    update_batch.UpdateSet(i, i, rn[update_idx]);
-    //    ++update_idx;
-    //    if (update_idx >= count) { break; }
-    //  }
-    //  LOG(INFO) << "test get " << r;
-    //  petuum::RowAccessor row_acc;
-    //  blob->table()->template Get<petuum::DenseRow<Dtype> >(
-    //    r, &row_acc, 0);
-    //  LOG(INFO) << "batch inc " << r;
-    //  blob->table()->BatchInc(r, update_batch);
-    //  LOG(INFO) << "batch inc done " << r;
-    //  if (update_idx >= count) { break; }
-    //}
     for (int r = 0; r < util::Context::num_rows_per_table(); ++r) {
-      petuum::DenseUpdateBatch<Dtype> update_batch(0, global_table_row_capacity);
+      petuum::UpdateBatch<Dtype> update_batch(global_table_row_capacity);
       for (int i = 0; i < global_table_row_capacity; ++i) {
-        update_batch[i] = rn[update_idx];
+        update_batch.UpdateSet(i, i, rn[update_idx]);
         ++update_idx;
         if (update_idx >= count) { break; }
       }
-      LOG(INFO) << "test get " << r;
-      petuum::RowAccessor row_acc;
-      blob->table()->template Get<petuum::DenseRow<Dtype> >(
-        r, &row_acc, 0);
-      LOG(INFO) << "dense batch inc " << r;
-      blob->table()->DenseBatchInc(r, update_batch);
-      LOG(INFO) << "dense batch inc done " << r;
+      //LOG(INFO) << "test get " << r;
+      //petuum::RowAccessor row_acc;
+      //blob->table()->template Get<petuum::DenseRow<Dtype> >(
+      //  r, &row_acc, 0);
+      //LOG(INFO) << "batch inc " << r;
+      blob->table()->BatchInc(r, update_batch);
+      //LOG(INFO) << "batch inc done " << r;
       if (update_idx >= count) { break; }
     }
+    //
+    //for (int r = 0; r < util::Context::num_rows_per_table(); ++r) {
+    //  petuum::DenseUpdateBatch<Dtype> update_batch(0, global_table_row_capacity);
+    //  for (int i = 0; i < global_table_row_capacity; ++i) {
+    //    update_batch[i] = rn[update_idx];
+    //    ++update_idx;
+    //    if (update_idx >= count) { break; }
+    //  }
+    //  blob->table()->DenseBatchInc(r, update_batch);
+    //  if (update_idx >= count) { break; }
+    //}
 
     delete rn;
     CHECK_EQ(this->filler_param_.sparse(), -1)

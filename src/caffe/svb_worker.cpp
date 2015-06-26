@@ -13,7 +13,7 @@ namespace caffe {
 template<typename Dtype>
 SVBWorker<Dtype>::SVBWorker() : comm_bus_(NULL),
     local_sv_queues_(util::Context::local_sv_queues()),
-    remote_sv_queues_(util::Context::remote_sv_queues()) { }
+    remote_sv_queues_(util::Context::remote_sv_queues()) {}
 
 template<typename Dtype>
 void SVBWorker<Dtype>::Init() {
@@ -42,12 +42,12 @@ void SVBWorker<Dtype>::Init() {
 
 template<typename Dtype>
 void SVBWorker<Dtype>::Connect() {
-  LOG(INFO) << "Connect " << client_id_;
+  //LOG(INFO) << "Connect " << client_id_;
   auto &host_info = host_map_[client_id_];
   comm_bus_ = new petuum::CommBus(client_id_, client_id_, host_map_.size());
   int ltype = (client_id_ == host_map_.size() - 1)
               ? petuum::CommBus::kNone : petuum::CommBus::kInterProc;
-  LOG(ERROR) << "My ADDR " << host_info.ip << ":" << port_; 
+  LOG(INFO) << client_id_ << " ADDR " << host_info.ip << ":" << port_; 
   petuum::CommBus::Config config(client_id_, ltype, host_info.ip +
                                  + ":" + std::to_string(port_));
   comm_bus_->ThreadRegister(config);
@@ -62,7 +62,7 @@ void SVBWorker<Dtype>::Connect() {
     auto &other_host_info = host_map_[i];
     int other_port = std::stoi(other_host_info.port, 0) + 1000;
 
-    LOG(ERROR) << "ConnectTo " << other_host_info.ip << ":" << other_port; 
+    LOG(ERROR) << client_id_ << " ConnectTo " << other_host_info.ip << ":" << other_port; 
     comm_bus_->ConnectTo(
         i, other_host_info.ip + ":" + std::to_string(other_port),
         &conn_msg, sizeof(conn_msg));
@@ -97,8 +97,30 @@ void SVBWorker<Dtype>::Connect() {
     }
   }
 
+  LOG(INFO) << client_id_ << " has received all conns, sending out msgs now";
+  for (int32_t dst = 0; dst < host_map_.size(); dst++) {
+    int non_conn_msg = client_id_ + 100;
+    if (dst == client_id_) continue; // cannot send to myself
+    comm_bus_->SendInterProc(dst, &non_conn_msg, sizeof(non_conn_msg));
+  }
+
+  LOG(INFO) << client_id_ << " send out all msgs, receive my remaininy msgs now";
+  while (num_other_msgs < host_map_.size() - 1) {
+    zmq::message_t msg;
+    int32_t sender_id;
+    comm_bus_->RecvInterProc(&sender_id, &msg);
+    int msg_val = *reinterpret_cast<int*>(msg.data());
+    if (msg_val == sender_id) {
+      LOG(FATAL) << "Error!";
+    } else {
+      num_other_msgs++;
+      LOG(INFO) << client_id_ <<  " received nonconn from " << sender_id
+              << " msg = " << msg_val;
+    }
+  }
+
   // From now on, one client can send and receive from any other (not itself).
-  LOG(INFO) << "Client " << client_id_ << " connected.";
+  LOG(INFO) << client_id_ << " connected.";
 }
 
 template<typename Dtype>
@@ -122,23 +144,24 @@ void SVBWorker<Dtype>::Send() {
       string msg_str;
       vp->SerializeToString(&msg_str);
       CHECK_EQ(msg_str.size(), vp->ByteSize()); // TODO: remove
-      LOG(INFO) << "send " << msg_str.size() << "\t" << vp->layer_id() << "\t" 
-          << vp->a_size() << "\t" << vp->b_size();
+      //LOG(INFO) << "client " << client_id_ << " send " << msg_str.size() << "\t" << vp->layer_id() << "\t" 
+      //    << vp->a_size() << "\t" << vp->b_size();
       for (int dst = 0; dst < host_map_.size(); dst++) {
         if (dst == client_id_) continue; // cannot send to myself
         size_t sz = comm_bus_->SendInterProc(dst, msg_str.c_str(), msg_str.size());
         CHECK_EQ(sz, msg_str.size());
       }
       delete vp;
+      //LOG(INFO) << "client " << client_id_ << " send done";
     }
-  }  
+  }
   
   //for (int32_t dst = 0; dst < host_map_.size(); dst++) {
   //  int non_conn_msg = client_id_ + 100;
   //  if (dst == client_id_) continue; // cannot send to myself
   //  comm_bus_->SendInterProc(dst, &non_conn_msg, sizeof(non_conn_msg));
   //}
-  LOG(INFO) << "send";
+  //LOG(INFO) << "send";
 }
 
 template<typename Dtype>
@@ -158,12 +181,16 @@ void SVBWorker<Dtype>::Receive() {
     SVProto vp;
     CHECK(vp.ParseFromArray(msg.data(), msg.size())) << "SVB message parsing error\n"
         << msg.size();
-    LOG(INFO) << "recv succ " << vp.layer_id();
-    // add to the remote-sv queue
+    //LOG(INFO) << "client " << client_id_ << " recv succ " << vp.layer_id() << "\t" 
+    //    << msg.size() << "\t" << vp.a_size() << "\t" << vp.b_size();
+    // add to the remote-sv queue 
     SufficientVector* v = new SufficientVector();
     v->FromProto<Dtype>(vp);
+    //LOG(INFO) << "client " << client_id_ << " fromproto done";
+
     CHECK_LT(v->layer_id(), remote_sv_queues_.size());
     remote_sv_queues_[v->layer_id()]->Add(v);
+    //LOG(INFO) << "client " << client_id_ << " remote add done";
   }
 
   //while (num_other_msgs < host_map_.size() - 1) {
@@ -179,12 +206,14 @@ void SVBWorker<Dtype>::Receive() {
   //            << " msg = " << msg_val;
   //  }
   //}
-  LOG(INFO) << "recv";
+  //LOG(INFO) << "recv";
 }
 
 template<typename Dtype>
 void SVBWorker<Dtype>::Start() {
+  LOG(INFO) << "svb init\t" << client_id_;
   Init();
+  LOG(INFO) << "svb init done\t" << client_id_;
  
   LOG(INFO) << "svb connect " << host_map_.size() << "\t" << client_id_;
   Connect();

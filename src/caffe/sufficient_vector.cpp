@@ -61,15 +61,15 @@ void* SufficientVector::mutable_gpu_b() {
 
 template <typename Dtype>
 void SufficientVector::FromProto(const SVProto& proto) {
-  Reshape(proto.a_size(), proto.b_size());
+  Reshape(proto.a_size() * sizeof(Dtype), proto.b_size() * sizeof(Dtype));
   layer_id_ = proto.layer_id();
 
   Dtype* a_vec = static_cast<Dtype*>(mutable_cpu_a());
-  for (int i = 0; i < a_size_; ++i) {
+  for (int i = 0; i < proto.a_size(); ++i) {
     a_vec[i] = proto.a(i);
   }
   Dtype* b_vec = static_cast<Dtype*>(mutable_cpu_b());
-  for (int i = 0; i < b_size_; ++i) {
+  for (int i = 0; i < proto.b_size(); ++i) {
     b_vec[i] = proto.b(i);
   }
 }
@@ -87,9 +87,6 @@ void SufficientVector::ToProto(SVProto* proto) const {
   for (int i = 0; i < a_size_ / sizeof(Dtype); ++i) {
     proto->add_a(a_vec[i]);
   }
-  LOG(ERROR) << "----------------------------------------------\n" 
-      << a_size_ / sizeof(Dtype) << "\t" << proto->a_size() << "\t" << a_size_ << "\t" << sizeof(Dtype)
-      << "---------------------------------------------------\n";
   const Dtype* b_vec = static_cast<const Dtype*>(cpu_b());
   for (int i = 0; i < b_size_ / sizeof(Dtype); ++i) {
     proto->add_b(b_vec[i]);

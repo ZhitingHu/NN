@@ -64,20 +64,16 @@ class Blob {
   inline int global_id() const { return global_id_; }
   inline petuum::Table<Dtype>* table() { return global_table_ptr_; }
   inline void set_table(const int global_id, const bool reg) {
-    LOG(INFO) << "blob here, table " << global_id;
     CHECK_EQ(blob_mode_, BlobProto_BlobMode_GLOBAL);
     CHECK_GE(global_id, 0);
     global_id_ = global_id;
     global_table_ = petuum::PSTableGroup::GetTableOrDie<Dtype>(global_id_);
     global_table_ptr_ = &global_table_;
     if (reg) {
-      LOG(INFO) << "blob here 0.5";
       for (int ridx = 0; ridx < util::Context::num_rows_per_table(); ++ridx) {
-        LOG(INFO) << "blob here r=" << ridx;
         global_table_ptr_->GetAsyncForced(ridx);
-        LOG(INFO) << "blob here r=" << ridx << " done";
       }   
-      LOG(INFO) << "blob here 1";
+      global_table_ptr_->WaitPendingAsyncGet();
     }     
   }
   inline int offset(const int n, const int c = 0, const int h = 0,

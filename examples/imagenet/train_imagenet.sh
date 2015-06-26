@@ -44,7 +44,7 @@ unique_host_list=`cat $host_file | awk '{ print $2 }' | uniq`
 num_unique_hosts=`cat $host_file | awk '{ print $2 }' | uniq | wc -l`
 
 output_dir=$app_dir/output
-output_dir="${output_dir}/caffe.${dataset}.S${staleness}"
+output_dir="${output_dir}/caffe.${dataset}.S${param_table_staleness}"
 output_dir="${output_dir}.M${num_unique_hosts}"
 output_dir="${output_dir}.T${num_app_threads}"
 log_dir=$output_dir/logs

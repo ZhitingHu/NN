@@ -49,7 +49,7 @@ DEFINE_int32(num_rows_per_table, 1,
     "Number of rows per parameter table.");
 DEFINE_bool(svb, true, 
     "True to use SVB for inner_product layers");
-DEFINE_int32(svb_timeout_ms, 1000, 
+DEFINE_int32(svb_timeout_ms, 10, 
     "Milliseconds the svb receiver waits for");
 
 // Caffe Parameters
@@ -132,8 +132,6 @@ int train() {
       && solver_param.solver_mode() == caffe::SolverParameter_SolverMode_GPU) {
     FLAGS_gpu = solver_param.device_id();
   }
-  // Currently, Petuum Caffe only supports CPU
-  //FLAGS_gpu = -1;
 
   // Set device id and mode
   if (FLAGS_gpu >= 0) {
@@ -149,8 +147,8 @@ int train() {
   LOG(INFO) << "Initializing PS environment";
   shared_ptr<caffe::CaffeEngine<float> >
       caffe_engine(new caffe::CaffeEngine<float>(solver_param));
-
   petuum::PSTableGroup::CreateTableDone();
+  LOG(INFO) << "PS initialization done.";
   if (FLAGS_num_clients > 1 && FLAGS_svb && util::Context::num_ip_layers() > 0) {
     util::Context::set_use_svb(true);
   } 
@@ -167,8 +165,11 @@ int train() {
     // SVB
   std::thread svb_worker_thread;
   if (util::Context::use_svb()) {
+    LOG(INFO) << "svb create\t" << FLAGS_client_id;
     shared_ptr<caffe::SVBWorker<float> > 
         svb_worker(new caffe::SVBWorker<float>());
+    LOG(INFO) << "svb create done\t" << FLAGS_client_id;
+
     svb_worker_thread = std::thread(
         &caffe::SVBWorker<float>::Start, std::ref(*svb_worker));
   }
@@ -178,7 +179,9 @@ int train() {
     thr.join();
   }
   util::Context::set_svb_completed(true);
-  svb_worker_thread.join();
+  if (util::Context::use_svb()) {
+    svb_worker_thread.join();
+  }
   LOG(INFO) << "Optimization Done.";
 
   petuum::PSTableGroup::ShutDown();

@@ -128,6 +128,8 @@ void InnerProductLayer<Dtype>::ComputeGradientFromSV_cpu(
   // Gradient with respect to weight
   const Dtype* top_diff = (const Dtype*)v->cpu_a();
   const Dtype* bottom_data = (const Dtype*)v->cpu_b();
+  CHECK_EQ(v->a_size() / sizeof(Dtype), N_);
+  CHECK_EQ(v->b_size() / sizeof(Dtype), K_);
   caffe_cpu_gemm<Dtype>(CblasTrans, CblasNoTrans, N_, K_, M_, (Dtype)1.,
       top_diff, bottom_data, (Dtype)0., this->blobs_[0]->mutable_cpu_diff());
 }

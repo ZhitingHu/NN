@@ -324,6 +324,9 @@ const int Net<Dtype>::InitPS(const NetParameter& in_param,
   int table_id = 0;
   int num_ip_layers = 0;
   for (int layer_id = 0; layer_id < param.layers_size(); ++layer_id) {
+
+    LOG(INFO) << "INIT " << layer_id << "/" << (param.layers_size() - 1);
+
     const LayerParameter& layer_param = param.layers(layer_id);
     layers_.push_back(shared_ptr<Layer<Dtype> >(GetLayer<Dtype>(layer_param)));
     layer_names_.push_back(layer_param.name()); 

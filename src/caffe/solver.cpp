@@ -272,10 +272,12 @@ void Solver<Dtype>::Solve(const char* resume_file) {
       }
     }
   }
+  LOG(INFO) << "here";
   // Init SVB
   if (context.use_svb()) {
     InitSVB(); 
   } 
+  LOG(INFO) << "here 1";
 
   iter_ = 0;
   // Restore if necessary
@@ -305,8 +307,12 @@ void Solver<Dtype>::Solve(const char* resume_file) {
   vector<Dtype> output_cache(count_temp + caffe::kNumFixedCols);
 
   // Synchronize
+  LOG(INFO) << "here 2";
   petuum::PSTableGroup::GlobalBarrier();
+  LOG(INFO) << "__________________________________________________________________" << client_id_
+      << "\t" << clock_counter_ - param_table_staleness_ << "\t" << param_table_staleness_;
   net_->SyncWithPS(clock_counter_ - param_table_staleness_);
+  LOG(INFO) << "__________________________________________________________________ done " << client_id_;
 
   // For a network that is trained by the solver, no bottom or top vecs
   // should be given, and we will just provide dummy vecs.
@@ -320,8 +326,8 @@ void Solver<Dtype>::Solve(const char* resume_file) {
     //LOG(INFO) << "join " << client_id_;
     float join_start_time = total_timer_.elapsed();
     JoinSyncThreads();
-    if (client_id_ == 0)
-        LOG(INFO) << "join done\t" << client_id_ << "\t" << total_timer_.elapsed() - join_start_time;
+    //if (client_id_ == 0)
+    //    LOG(INFO) << "join done\t" << client_id_ << "\t" << total_timer_.elapsed() - join_start_time;
 
     // Save a snapshot if needed.
     if (param_.snapshot() && iter_ > start_iter &&
@@ -338,11 +344,11 @@ void Solver<Dtype>::Solve(const char* resume_file) {
     net_->set_debug_info(display && param_.debug_info());
 
     float forward_start_time = total_timer_.elapsed();
-    if (client_id_ == 0)
-        LOG(INFO) << "compute " << client_id_;
+    //if (client_id_ == 0)
+    //    LOG(INFO) << "compute " << client_id_;
     Dtype loss = ForwardBackward(bottom_vec);
-    if (client_id_ == 0)
-        LOG(INFO) << "compute done\t" << client_id_ << "\t" << total_timer_.elapsed() - forward_start_time;
+    //if (client_id_ == 0)
+    //    LOG(INFO) << "compute done\t" << client_id_ << "\t" << total_timer_.elapsed() - forward_start_time;
 
     if (display) {
       if (client_id_ == 0 && thread_id_ == 0) {
@@ -429,8 +435,8 @@ Dtype Solver<Dtype>::ForwardBackward(const vector<Blob<Dtype>* >& bottom) {
 
   /// Forward
   net_->Forward(bottom, &loss);
-  if (client_id_ == 1)
-    LOG(INFO) << "forward done " << client_id_;
+  //if (client_id_ == 1)
+  //  LOG(INFO) << "forward done " << client_id_;
   
   /// Backward
   const vector<shared_ptr<Layer<Dtype> > >& layers = net_->layers();
@@ -473,6 +479,7 @@ Dtype Solver<Dtype>::ForwardBackward(const vector<Blob<Dtype>* >& bottom) {
                 net_->params()[param_id], layers[i], i, top_vecs[i],
                 bottom_vecs[i]);
           } else {
+            //TODO
             sync_thread = new std::thread(&Solver::ThreadSyncWithPS, this, 
                 net_->params()[param_id], param_id, param_owner,
                 clock_counter_ - param_table_staleness_);
