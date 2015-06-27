@@ -11,6 +11,7 @@ BaseDataLayer<Dtype>::BaseDataLayer(const LayerParameter& param)
     : Layer<Dtype>(param),
       transform_param_(param.transform_param()),
       data_transformer_(transform_param_) {
+  data_transformer_.set_phase(Caffe::phase(this->thread_id_));
 }
 
 template <typename Dtype>

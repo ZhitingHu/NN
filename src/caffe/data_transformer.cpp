@@ -20,6 +20,19 @@ void DataTransformer<Dtype>::Transform(const int batch_item_id,
   const int crop_size = param_.crop_size();
   const bool mirror = param_.mirror();
   const Dtype scale = param_.scale();
+  //
+  const bool has_mean_file = param_.has_mean_file();
+  const bool has_mean_values = mean_values_.size() > 0;
+  if (has_mean_values) {
+    CHECK(mean_values_.size() == 1 || mean_values_.size() == channels) <<
+     "Specify either 1 mean_value or as many as channels: " << channels;
+    if (channels > 1 && mean_values_.size() == 1) {
+      // Replicate the mean_value for simplicity
+      for (int c = 1; c < channels; ++c) {
+        mean_values_.push_back(mean_values_[0]);
+      }
+    }
+  }
 
   if (mirror && crop_size == 0) {
     LOG(FATAL) << "Current implementation requires mirror and crop_size to be "
@@ -47,8 +60,19 @@ void DataTransformer<Dtype>::Transform(const int batch_item_id,
                 * crop_size + (crop_size - 1 - w);
             Dtype datum_element =
                 static_cast<Dtype>(static_cast<uint8_t>(data[data_index]));
-            transformed_data[top_index] =
+            //transformed_data[top_index] =
+            //    (datum_element - mean[data_index]) * scale;
+            if (has_mean_file) {
+              transformed_data[top_index] =
                 (datum_element - mean[data_index]) * scale;
+            } else {
+              if (has_mean_values) {
+                transformed_data[top_index] =
+                  (datum_element - mean_values_[c]) * scale;
+              } else {
+                transformed_data[top_index] = datum_element * scale;
+              }
+            }
           }
         }
       }
@@ -62,13 +86,27 @@ void DataTransformer<Dtype>::Transform(const int batch_item_id,
             int data_index = (c * height + h + h_off) * width + w + w_off;
             Dtype datum_element =
                 static_cast<Dtype>(static_cast<uint8_t>(data[data_index]));
-            transformed_data[top_index] =
+            //transformed_data[top_index] =
+            //    (datum_element - mean[data_index]) * scale;
+            if (has_mean_file) {
+              transformed_data[top_index] =
                 (datum_element - mean[data_index]) * scale;
+            } else {
+              if (has_mean_values) {
+                transformed_data[top_index] =
+                  (datum_element - mean_values_[c]) * scale;
+              } else {
+                transformed_data[top_index] = datum_element * scale;
+              }
+            }
           }
         }
       }
     }
   } else {
+    if (has_mean_values) {
+      LOG(FATAL) << "Don't support mean_values if crop_size = 0.";
+    }
     // we will prefer to use data() first, and then try float_data()
     if (data.size()) {
       for (int j = 0; j < size; ++j) {
