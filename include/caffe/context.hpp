@@ -17,6 +17,7 @@ namespace util {
 class Context {
 public:
   static Context& get_instance();
+  ~Context();
 
   int get_int32(std::string key);
   double get_double(std::string key);

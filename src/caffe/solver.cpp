@@ -52,14 +52,14 @@ void Solver<Dtype>::Init(const SolverParameter& param) {
   }
   param_ = param;
 
-  // Scaffolding code
+  /// Scaffolding code
   InitTrainNet();
   LOG(INFO) << "Init training net done.";
   InitTestNets();
   LOG(INFO) << "Init test nets done.";
   if (client_id_ == 0 && thread_id_ == 0) {
     LOG(INFO) << "Solver scaffolding done.";
-  }
+  }  
 }
 
 template <typename Dtype>

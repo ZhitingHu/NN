@@ -28,6 +28,17 @@ Context::Context() {
   svb_completed_ = false;
 }
 
+Context::~Context() {
+  int sz = local_sv_queues_.size();
+  for (int i = 0; i < sz; ++i) {
+    delete local_sv_queues_[i];
+  }
+  sz = remote_sv_queues_.size();
+  for (int i = 0; i < sz; ++i) {
+    delete remote_sv_queues_[i];
+  }
+}
+
 // -------------------- SVB -------------------------
 
 void Context::InitSVB(const int num_layers) {

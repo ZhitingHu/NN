@@ -118,6 +118,11 @@ void CaffeEngine<Dtype>::InitPSForTrainNet(const int num_additional_tables) {
     CreatePSTableForNetOutputs(net_, train_net_output_name, param_.display(),
         num_rows_train_net_outputs);
   }
+
+  // Init SVB 
+  util::Context& context = util::Context::get_instance();
+  context.InitSVB(net_->layers().size());
+
   // delete net_
   net_.reset();
 }
@@ -200,7 +205,9 @@ void CaffeEngine<Dtype>::CreatePSTableForNetOutputs(
   table_config.table_info.table_staleness = loss_table_staleness_;
   table_config.process_cache_capacity = num_rows;
   table_config.oplog_capacity = table_config.process_cache_capacity;
-  table_config.process_storage_type = petuum::BoundedDense;
+  //table_config.process_storage_type = petuum::BoundedDense;
+  //TODO
+  table_config.no_oplog_replay = true;
 
   int count = 0; 
   if (display) {

@@ -101,6 +101,8 @@ void Blob<Dtype>::CreatePSTable() {
   table_config.table_info.dense_row_oplog_capacity
       = global_table_row_capacity_;
   //table_config.process_storage_type = petuum::BoundedDense;
+  //TODO
+  table_config.no_oplog_replay = true;
 
   petuum::PSTableGroup::CreateTable(global_id_, table_config);
 }
